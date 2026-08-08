@@ -40,9 +40,20 @@ const menuBtn = h('button', {
   class: 'btn btn--ghost btn--icon sidebtn', 'aria-label': 'Open navigation', 'aria-expanded': 'false',
   html: icon('menu'),
 });
-menuBtn.addEventListener('click', () => {
-  const open = sideEl.classList.toggle('is-open');
+const setDrawer = (open) => {
+  sideEl.classList.toggle('is-open', open);
   menuBtn.setAttribute('aria-expanded', String(open));
+};
+menuBtn.addEventListener('click', () => setDrawer(!sideEl.classList.contains('is-open')));
+/* The open drawer covers the menu button, so it also has to close on an
+   outside click and on Escape — otherwise the only way out is to navigate. */
+document.addEventListener('click', (e) => {
+  if (!sideEl.classList.contains('is-open')) return;
+  if (sideEl.contains(e.target) || menuBtn.contains(e.target)) return;
+  setDrawer(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && sideEl.classList.contains('is-open')) setDrawer(false);
 });
 
 const newBtn = h('button', { class: 'btn btn--primary', html: `${icon('plus')}<span>New booking</span>` });
@@ -83,7 +94,7 @@ sideEl.appendChild(h('div', { class: 'side__brand' },
     h('div', { class: 'side__tag' }, 'Booking desk'))));
 sideEl.appendChild(navEl);
 
-const resetBtn = h('button', { class: 'navlink', html: `${icon('refresh')}<span>Reset demo data</span>` });
+const resetBtn = h('button', { class: 'navlink', title: 'Reset demo data', 'aria-label': 'Reset demo data', html: `${icon('refresh')}<span>Reset demo data</span>` });
 resetBtn.addEventListener('click', async () => {
   const ok = await confirmDialog(
     'This puts every service, staff rota, customer and booking back to the sample set. Anything you changed in this browser is dropped.',
@@ -93,17 +104,63 @@ resetBtn.addEventListener('click', async () => {
   toast('Demo data reset', 'ok');
 });
 
-const aboutBtn = h('button', { class: 'navlink', html: `${icon('eye')}<span>About this demo</span>` });
+const aboutBtn = h('button', { class: 'navlink', title: 'About this demo', 'aria-label': 'About this demo', html: `${icon('eye')}<span>About this demo</span>` });
 aboutBtn.addEventListener('click', aboutModal);
+
+/* ---------- sidebar preferences (own key, untouched by "Reset demo data") ---------- */
+const UI_KEY = 'slotly.ui';
+const ui = (() => {
+  try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch (_) { return {}; }
+})();
+const saveUI = () => { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch (_) {} };
+
+/* Rail mode is a desktop concern — under 900px the sidebar is already an
+   off-canvas drawer, so the class is simply never applied there. */
+const wide = window.matchMedia('(min-width:901px)');
+
+const railBtn = h('button', {
+  class: 'btn btn--sm',
+  type: 'button',
+  'data-act': 'rail',
+  html: `${icon('arrowRight')}<span>Collapse</span>`,
+});
+const toneBtn = h('button', {
+  class: 'btn btn--sm',
+  type: 'button',
+  'data-act': 'tone',
+  html: `${icon('spark')}<span>Colour</span>`,
+});
+
+function applyChrome() {
+  const rail = !!ui.rail && wide.matches;
+  shellEl.classList.toggle('is-rail', rail);
+  railBtn.setAttribute('aria-pressed', String(!!ui.rail));
+  railBtn.setAttribute('aria-label', ui.rail ? 'Expand sidebar' : 'Collapse sidebar to icons');
+  railBtn.title = ui.rail ? 'Expand sidebar' : 'Collapse sidebar to icons';
+  railBtn.querySelector('svg').style.transform = ui.rail ? '' : 'rotate(180deg)';
+  railBtn.querySelector('span').textContent = ui.rail ? 'Expand' : 'Collapse';
+
+  if (ui.tone === 'amber') sideEl.setAttribute('data-tone', 'amber');
+  else sideEl.removeAttribute('data-tone');
+  toneBtn.setAttribute('aria-pressed', String(ui.tone === 'amber'));
+  const toneLabel = ui.tone === 'amber' ? 'Use the white sidebar' : 'Use the brand yellow sidebar';
+  toneBtn.setAttribute('aria-label', toneLabel);
+  toneBtn.title = toneLabel;
+}
+
+railBtn.addEventListener('click', () => { ui.rail = !ui.rail; saveUI(); applyChrome(); });
+toneBtn.addEventListener('click', () => { ui.tone = ui.tone === 'amber' ? null : 'amber'; saveUI(); applyChrome(); });
+wide.addEventListener('change', applyChrome);
 
 sideEl.appendChild(h('div', { class: 'side__foot' },
   aboutBtn,
   resetBtn,
-  h('div', { class: 'small faint', style: 'padding:10px 10px 2px;line-height:1.5' },
+  h('div', { class: 'side__toggles', style: 'margin-top:10px' }, railBtn, toneBtn),
+  h('div', { class: 'side__sub small faint', style: 'padding:10px 10px 2px;line-height:1.5' },
     'Demo build by ',
     h('a', { class: 'linkish', href: 'https://www.nasvih.in', target: '_blank', rel: 'noopener' }, 'Muhammed Nasvih V'))));
 
-app.appendChild(h('div', { class: 'shell' },
+const shellEl = h('div', { class: 'shell' },
   sideEl,
   h('div', { class: 'main' },
     h('header', { class: 'topbar' },
@@ -112,7 +169,9 @@ app.appendChild(h('div', { class: 'shell' },
       h('div', { class: 'spacer' }),
       demoPill,
       newBtn),
-    viewHost)));
+    viewHost));
+app.appendChild(shellEl);
+applyChrome();
 
 /* ---------- context handed to every view ---------- */
 let current = 'today';
@@ -148,11 +207,13 @@ function drawNav() {
       const link = h('a', {
         class: `navlink${v.id === current ? ' is-active' : ''}`,
         href: `#/${v.id}`,
+        title: `${v.label} — ${v.sub.toLowerCase()}`,
+        'aria-label': v.label,
         'aria-current': v.id === current ? 'page' : null,
         html: `${icon(v.icon)}<span>${v.label}</span>`,
       });
       if (c[v.id] !== undefined) link.appendChild(h('span', { class: 'navlink__count mono' }, String(c[v.id])));
-      link.addEventListener('click', () => sideEl.classList.remove('is-open'));
+      link.addEventListener('click', () => setDrawer(false));
       box.appendChild(link);
     }
     navEl.appendChild(box);
@@ -183,7 +244,7 @@ const nav = router(routes, (route, params, query) => {
   current = route;
   ctx.params = params;
   ctx.query = query;
-  sideEl.classList.remove('is-open');
+  setDrawer(false);
   draw();
 });
 store.subscribe(() => draw());

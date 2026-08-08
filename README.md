@@ -43,6 +43,11 @@ behind the `DEMO` pill in the topbar.
 | **Customers** | Visit history and no-show rate per customer, sortable, with a reminder-call filter for anyone at 25% or above. Detail drawer with a 16-booking outcome strip, a desk note and full history. CSV export. |
 | **Settings** | Desk name, opening and closing time, slot length, closed days, token prefix. Three message templates with `{{name}}`-style placeholders, insertable placeholder chips and a live preview rendered against a real booking. Demo data counts and the reset action. |
 
+The sidebar collapses to a 64px icon rail and switches to the brand yellow from two controls
+in its footer; both choices persist under their own `slotly.ui` key, separate from the demo
+data. The assistant has a single entry point — the round launcher at the bottom right, or
+`⌘K` / `Ctrl+K`.
+
 Three flows that persist through `localStorage`: **booking** (calendar or dialog → blocks the
 slot → appears in Today), **queue state changes** (call / serve / done / no-show / undo),
 **setup edits** (service prices and toggles, staff rotas, message templates, desk notes).

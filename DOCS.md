@@ -204,6 +204,31 @@ one, double-booking rules or room constraints all belong there, and every screen
 
 Shortcuts are ignored while typing in an input, a textarea or a select.
 
+## Sidebar controls
+
+Two buttons sit in the sidebar footer, one click away from every screen.
+
+| Control | Effect |
+|---|---|
+| **Collapse / Expand** | Toggles `is-rail` on the `.shell` element: a 64px icon rail with labels, group headings and counts hidden. Every nav link keeps a `title` and an `aria-label`, so the rail stays readable to a screen reader and on hover. |
+| **Colour** | Toggles `data-tone="amber"` on the `.side` element, switching the sidebar to the brand yellow with ink text. |
+
+Both use `aria-pressed`. Both persist in `localStorage` under **`slotly.ui`** — a separate key
+from the demo data, so **Reset demo data** does not disturb the chrome.
+
+Rail mode is a desktop concern. Under 900px the sidebar is already an off-canvas drawer, so
+the `is-rail` class is never applied there (guarded by a `matchMedia('(min-width:901px)')`
+check that also re-runs on resize) and the collapse control is hidden by CSS. The open drawer
+covers the menu button, so it closes on an outside click and on `Escape` as well as on
+navigation.
+
+## The assistant has exactly one entry point
+
+The round 52px launcher at the bottom right, plus `⌘K` / `Ctrl+K`. There is deliberately no
+topbar button, no sidebar item and no in-page link that opens it — the launcher is mounted
+once by `bot.mount(document.body)` in `src/main.js`, and `lib/assistant.js` owns its markup,
+its accessible name and its glyph.
+
 Accessibility: the sidebar collapses under 900px behind a labelled menu button, every
 icon-only button carries an `aria-label`, toggles expose `aria-pressed`, the active nav item
 carries `aria-current="page"`, drawers and modals close on `Escape`, and status is always
