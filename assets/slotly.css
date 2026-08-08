@@ -124,15 +124,20 @@ button.pill:hover{border-color:var(--amber)}
 .aboutlist li{position:relative;padding-left:16px;font-size:12.5px;line-height:1.55;color:var(--muted)}
 .aboutlist li::before{content:"";position:absolute;left:0;top:6px;width:6px;height:6px;border-radius:var(--r-xs);background:var(--amber-fill)}
 .aboutlist b{color:var(--ink-2);font-weight:600}
+/* a repository URL is long and unbreakable — let it wrap rather than push the
+   modal wider than the 390px viewport */
+.aboutlink{font-size:11.5px;overflow-wrap:anywhere}
 
-/* == 7b. sidebar footer: site link + install ==
+/* == 7b. sidebar footer: links + install ==
    The yellow sidebar is the default here, so anything in the footer is read
-   against #EAC81C first and against white second. Ink on yellow, never white. */
+   against #EAC81C first and against white second. Ink on yellow, never white.
+   app.css owns the focus ring and the quiet-text colour on yellow; what is
+   below is only the parts that are this app's own markup. */
 
-/* the kit tints muted sidebar text with --amber-darker; the author line is ours,
-   so it follows the same rule instead of staying --faint grey on yellow */
-.side[data-tone="amber"] .side__sub{color:var(--amber-darker)}
-.side[data-tone="amber"] .side__sub .linkish{border-bottom-color:var(--amber-darker)}
+/* the author line follows app.css's rule for quiet text on yellow: --ink-2 at
+   8:1, not --amber-darker, which falls under AA against the fill */
+.side[data-tone="amber"] .side__sub{color:var(--ink-2)}
+.side[data-tone="amber"] .side__sub .linkish{border-bottom-color:var(--ink-2)}
 
 /* the one dark element in the sidebar. Ink ground, white type — 16:1 either way,
    and it reads as deliberate against the yellow rather than as a hole in it. */
@@ -144,14 +149,18 @@ button.pill:hover{border-color:var(--amber)}
 .side[data-tone="amber"] .sitelink svg{color:#FFFFFF}
 .side[data-tone="amber"] .sitelink:hover{background:var(--night-2)}
 
+/* the source link is an outline control, not a second inverted one — the
+   nasvih.in link stays the only dark element in the footer */
+.srclink{border:1px solid var(--line-2);margin-top:6px}
+.srclink:hover{background:var(--hover);border-color:var(--amber-line)}
+.side[data-tone="amber"] .srclink{background:rgba(255,255,255,.72);border-color:rgba(23,24,26,.24)}
+.side[data-tone="amber"] .srclink svg{color:var(--ink-2)}
+.side[data-tone="amber"] .srclink:hover{background:var(--bg)}
+
 /* the install control only exists when the browser offers it, so the host must
    collapse to nothing rather than leave a margin behind */
 .side__install{display:grid}
 .side__install .pwa-install{margin-top:6px}
-
-/* on yellow, the kit's amber focus ring is invisible. Ink reads at 10.8:1
-   against the fill and stays visible on the white active row and the dark link. */
-.side[data-tone="amber"] :focus-visible{outline-color:var(--ink)}
 
 /* the active row is white on yellow; a hover tint over it only muddies the state */
 .side[data-tone="amber"] .navlink.is-active:hover{background:var(--bg)}

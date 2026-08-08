@@ -60,9 +60,12 @@ document.addEventListener('keydown', (e) => {
 const newBtn = h('button', { class: 'btn btn--primary', html: `${icon('plus')}<span>New booking</span>` });
 newBtn.addEventListener('click', () => openBooking(ctx, {}));
 
-/* Four blocks: what the product is, what it removes from a working day, what a
-   real deployment would change, and the demo disclaimer. Each block is either a
-   paragraph or a short list, so it stays scannable inside the modal at 390px. */
+const REPO_URL = 'https://github.com/nasvih/slotly-booking-scheduling-system';
+
+/* Five blocks: what the product is, what it removes from a working day, what a
+   real deployment would change, the demo disclaimer, and where to read the
+   source. Each block is a paragraph, a short list or a link, so it stays
+   scannable inside the modal at 390px. */
 const ABOUT = [
   {
     title: 'What this is',
@@ -90,6 +93,13 @@ const ABOUT = [
       ['The assistant is simulated.', 'Slotly Desk answers by matching your question against this app\'s own demo data. It is a demonstration of the interaction, not a connected model, and no request leaves your browser.'],
     ],
   },
+  {
+    title: 'Source',
+    link: { href: REPO_URL, label: 'github.com/nasvih/slotly-booking-scheduling-system' },
+    /* Must not read as more permissive than LICENSE: source-available, not
+       open source, and anything past reading and running needs permission. */
+    text: 'The source is published so it can be read, run and evaluated. It is not open source — copying, modifying, redistributing or using it in your own work needs the author\'s written permission.',
+  },
 ];
 
 function aboutModal() {
@@ -98,6 +108,14 @@ function aboutModal() {
     width: '520px',
     body: h('div', { class: 'stack' }, ABOUT.map((block) => h('div', {},
       h('h4', { style: 'margin-bottom:4px' }, block.title),
+      block.link ? h('p', { class: 'small', style: 'margin-bottom:4px' },
+        h('a', {
+          class: 'linkish mono aboutlink',
+          href: block.link.href,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          'aria-label': `${block.link.label} — opens in a new tab`,
+        }, block.link.label)) : null,
       block.text ? h('p', { class: 'small muted' }, block.text) : null,
       block.list ? h('ul', { class: 'aboutlist' }, block.list.map((line) => (
         Array.isArray(line)
@@ -125,6 +143,10 @@ sideEl.appendChild(navEl);
 
 const resetBtn = h('button', { class: 'navlink', title: 'Reset demo data', 'aria-label': 'Reset demo data', html: `${icon('refresh')}<span>Reset demo data</span>` });
 resetBtn.addEventListener('click', async () => {
+  /* On a phone the sidebar is a fixed drawer at z-index 65 and the kit's scrim
+     sits at 60, so a dialog opened from the footer would be covered by the very
+     drawer it was opened from. The nav links already close it; so must these. */
+  setDrawer(false);
   const ok = await confirmDialog(
     'This puts every service, staff rota, customer and booking back to the sample set. Anything you changed in this browser is dropped.',
     { title: 'Reset demo data', danger: true, okLabel: 'Reset' });
@@ -134,7 +156,7 @@ resetBtn.addEventListener('click', async () => {
 });
 
 const aboutBtn = h('button', { class: 'navlink', title: 'About this demo', 'aria-label': 'About this demo', html: `${icon('eye')}<span>About this demo</span>` });
-aboutBtn.addEventListener('click', aboutModal);
+aboutBtn.addEventListener('click', () => { setDrawer(false); aboutModal(); });
 
 /* The one dark element in the sidebar: it has to stand out against the yellow
    default without introducing a colour that is not already in the tokens. */
@@ -147,6 +169,19 @@ const siteLink = h('a', {
   title: 'nasvih.in — opens in a new tab',
   'aria-label': 'nasvih.in — opens in a new tab',
   html: `${EXTERNAL}<span>nasvih.in</span>`,
+});
+
+/* Code brackets rather than the GitHub mark: the mark is a filled logo and
+   every icon in this app is stroke SVG on currentColor. */
+const CODE = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6.5L3.5 10 7 13.5"/><path d="M13 6.5L16.5 10 13 13.5"/><path d="M11.2 4.4L8.8 15.6"/></svg>';
+const srcLink = h('a', {
+  class: 'navlink srclink',
+  href: REPO_URL,
+  target: '_blank',
+  rel: 'noopener noreferrer',
+  title: 'Source on GitHub — opens in a new tab',
+  'aria-label': 'Source on GitHub — opens in a new tab',
+  html: `${CODE}<span>Source on GitHub</span>`,
 });
 
 /* ---------- sidebar preferences (own key, untouched by "Reset demo data") ---------- */
@@ -211,6 +246,7 @@ sideEl.appendChild(h('div', { class: 'side__foot' },
   resetBtn,
   aboutBtn,
   siteLink,
+  srcLink,
   h('div', { class: 'side__toggles', style: 'margin-top:10px' }, railBtn, toneBtn),
   installHost,
   h('div', { class: 'side__sub small faint', style: 'padding:10px 10px 2px;line-height:1.5' },

@@ -9,6 +9,12 @@ no backend. It runs from any static file server and from GitHub Pages unchanged.
 
 **Author:** Muhammed Nasvih V — [nasvih.in](https://www.nasvih.in) · [github.com/nasvih](https://github.com/nasvih)
 
+**Source:** [github.com/nasvih/slotly-booking-scheduling-system](https://github.com/nasvih/slotly-booking-scheduling-system)
+
+Source-available, not open source. You may read it, run it locally and evaluate it. Copying,
+modifying, redistributing or using it in your own work needs written permission — see
+[LICENSE](LICENSE).
+
 ---
 
 ## What this is
@@ -102,9 +108,10 @@ A service worker (`sw.js`) caches the whole app shell on first load — every st
 module, the icons and the manifest — so a reload works with no connection at all. There is
 nothing to sync, because the data was never on a server in the first place.
 
-If you change, add or remove a file, add it to the `SHELL` array in `sw.js` and bump
-`CACHE_VERSION`. A file that is missing from the list will not be there offline; a file listed
-that does not exist fails the whole install.
+If you add or remove a file, put it in the `SHELL` array in `sw.js`. A file missing from the
+list will not be there offline; a file listed that does not exist fails the whole install. And
+bump `CACHE_VERSION` whenever **any** cached file changes — the browser only reinstalls a
+worker whose own bytes changed, so without that bump returning visitors keep the old copy.
 
 ## Deploy to GitHub Pages
 

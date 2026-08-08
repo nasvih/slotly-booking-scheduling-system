@@ -218,8 +218,13 @@ it extra keyword matches.
 one, double-booking rules or room constraints all belong there, and every screen inherits them.
 
 **Add a file.** Any new module, stylesheet or icon has to be added to the `SHELL` array in
-`sw.js` with `CACHE_VERSION` bumped in the same commit, or an installed copy will not have it
-when there is no connection.
+`sw.js`, or an installed copy will not have it when there is no connection.
+
+**Bump `CACHE_VERSION` whenever anything in `SHELL` changes at all** — not only when the list
+does. The browser only reinstalls a worker whose own bytes changed, so editing `main.js` and
+leaving `sw.js` alone leaves every returning visitor on the previously cached copy for good.
+Changing the version string is what makes `sw.js` differ, which triggers the reinstall, which
+re-fetches the shell and drops the old cache in `activate`.
 
 **Never** add a dependency, a build step, a `fetch` call to any host, or a gradient. The only
 `fetch` in the repository is inside `sw.js`, and it only ever re-issues a request the browser
@@ -247,14 +252,18 @@ Everything that is not a screen lives in the sidebar footer, one click away from
 | Control | Effect |
 |---|---|
 | **Reset demo data** | Confirms, then re-seeds `slotly.v1`. Leaves `slotly.ui` alone. |
-| **About this demo** | The four-block modal: what this is, where it helps, how it would work for real, how the demo works. Same content as the `DEMO` pill in the topbar. |
-| **nasvih.in** | Link to the author's site, `target="_blank" rel="noopener noreferrer"`, with an `aria-label` that says it opens in a new tab. |
+| **About this demo** | The five-block modal: what this is, where it helps, how it would work for real, how the demo works, and where to read the source. Same content as the `DEMO` pill in the topbar. |
+| **nasvih.in** | Link to the author's site. The one inverted control in the footer. |
+| **Source on GitHub** | Link to the repository, drawn as an outline control so the inverted one stays unique. The glyph is code brackets in stroke SVG — the GitHub mark is a filled logo and every icon here is a stroke on `currentColor`. |
 | **Collapse / Expand** | Toggles `is-rail` on the `.shell` element: a 64px icon rail with labels, group headings and counts hidden. Every nav link keeps a `title` and an `aria-label`, so the rail stays readable to a screen reader and on hover. |
 | **White / Yellow** | Toggles `data-tone="amber"` on the `.side` element. The button names the move rather than the state, the way Collapse/Expand does, so the toggle is not signalled by colour alone. |
 | **Install app** | Added by `initPWA` and hidden until the browser fires `beforeinstallprompt` (or immediately on iOS, where no such event exists). |
 
 The two toggles use `aria-pressed` and persist in `localStorage` under **`slotly.ui`** — a
-separate key from the demo data, so **Reset demo data** does not disturb the chrome.
+separate key from the demo data, so **Reset demo data** does not disturb the chrome. Both
+links carry `target="_blank" rel="noopener noreferrer"` and an `aria-label` that says they
+open in a new tab. In rail mode every one of these collapses to its icon, with the label
+still on `title` and `aria-label`.
 
 ### The yellow sidebar is the default
 
@@ -263,17 +272,20 @@ colour control writes `{"tone":"plain"}` and gives the plain white sidebar back,
 browser always opens yellow. Nothing is written on load — "no stored preference" stays
 literally true until the control is used.
 
-The kit already inks the yellow sidebar correctly: ink `#17181A` on `#EAC81C` is 10.8:1, the
-brand mark inverts to an ink tile, muted labels and counts go to `--amber-darker`, the active
-row becomes a solid white card and the footer buttons sit on a translucent white. Never white
-text on yellow. What the yellow default needed on top of that, all in `assets/slotly.css`:
+`assets/app.css` inks the yellow sidebar: ink `#17181A` on `#EAC81C` is 10.8:1, the brand mark
+inverts to an ink tile, quiet text (the tag line, group headings, nav counts) goes to
+`--ink-2` at 8:1 rather than `--amber-darker` which falls under AA against the fill, the focus
+ring switches from `--amber` — invisible on yellow — to ink, the active row becomes a solid
+white card, and the footer buttons sit on a translucent white. **Never white text on yellow.**
 
-| Fix | Why |
+`assets/slotly.css` adds only what is this app's own markup:
+
+| Rule | Why |
 |---|---|
-| `.side[data-tone="amber"] :focus-visible{outline-color:var(--ink)}` | The kit's focus ring is `--amber`, which is invisible on the amber fill. Ink reads on the yellow, on the white active row and on the dark site link alike. |
-| `.side[data-tone="amber"] .side__sub` → `--amber-darker` | The author line was `--faint` grey, which is a muddy read on yellow. |
+| `.side[data-tone="amber"] .side__sub` → `--ink-2` | The author line is ours, so it follows the same AA rule as the kit's quiet text instead of staying `--faint` grey on yellow. |
 | `.side[data-tone="amber"] .navlink.is-active:hover` pinned to `--bg` | The generic hover tint only muddied the white active card. |
-| `.sitelink` on `--night` with white type | The one dark element in the sidebar. It stands out against yellow without adding a colour that is not already a token, and it still reads on the white sidebar. Hover goes to `--night-2`. |
+| `.sitelink` on `--night` with white type | The one inverted element in the sidebar. It stands out against yellow without adding a colour that is not already a token, and it still reads on the white sidebar. Hover goes to `--night-2`. |
+| `.srclink` with a `--line-2` border | An outline control, deliberately not a second dark one — one inverted element in the footer is a focal point, two is a pattern. On yellow it takes the same translucent white ground as the toggle buttons beside it. |
 
 Both tones and the rail were checked in a browser at 1280px and 390px.
 
