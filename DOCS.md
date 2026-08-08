@@ -245,25 +245,37 @@ already made for one of these files.
 
 Shortcuts are ignored while typing in an input, a textarea or a select.
 
-## Sidebar footer
+## Sidebar chrome and footer
 
-Everything that is not a screen lives in the sidebar footer, one click away from anywhere.
+The two chrome controls sit on the brand row in `.side__brandbtns`, right of the app name.
+Both are icon-only — the kit clips their `<span>` and sizes them to 30×30 — so the glyph and
+the accessible name have to do all the work.
 
 | Control | Effect |
 |---|---|
-| **Reset demo data** | Confirms, then re-seeds `slotly.v1`. Leaves `slotly.ui` alone. |
+| **Collapse sidebar / Expand sidebar** | Toggles `is-rail` on the `.shell` element: a 64px icon rail with labels, group headings and counts hidden. `title` and `aria-label` name the action and follow the state; the glyph is a panel with a chevron pointing at the edge the sidebar is about to move to. |
+| **Sidebar colour** | Toggles `data-tone="amber"` on the `.side` element. It names no colour in the interface or in the accessible name — the glyph, a circle half filled, carries that, and `aria-pressed` reports whether the yellow tone is on. |
+
+In rail mode `.shell.is-rail .side__brandbtns` stacks the pair into a column under the mark,
+so both stay reachable inside 64px. Below 900px the collapse control is hidden in
+`assets/slotly.css`, because the sidebar is already a drawer there.
+
+Everything else lives in the footer: **About this demo** across the top, then two `.side__pair`
+rows that share their width and truncate rather than overflow.
+
+| Control | Effect |
+|---|---|
 | **About this demo** | The five-block modal: what this is, where it helps, how it would work for real, how the demo works, and where to read the source. Same content as the `DEMO` pill in the topbar. |
 | **nasvih.in** | Link to the author's site. The one inverted control in the footer. |
 | **Source on GitHub** | Link to the repository, drawn as an outline control so the inverted one stays unique. The glyph is code brackets in stroke SVG — the GitHub mark is a filled logo and every icon here is a stroke on `currentColor`. |
-| **Collapse / Expand** | Toggles `is-rail` on the `.shell` element: a 64px icon rail with labels, group headings and counts hidden. Every nav link keeps a `title` and an `aria-label`, so the rail stays readable to a screen reader and on hover. |
-| **White / Yellow** | Toggles `data-tone="amber"` on the `.side` element. The button names the move rather than the state, the way Collapse/Expand does, so the toggle is not signalled by colour alone. |
-| **Install app** | Added by `initPWA` and hidden until the browser fires `beforeinstallprompt` (or immediately on iOS, where no such event exists). |
+| **Install app** | Added by `initPWA` at the head of the last row and hidden until the browser fires `beforeinstallprompt` (or immediately on iOS, where no such event exists). While hidden it leaves the row entirely, so **Reset demo data** spans it alone. |
+| **Reset demo data** | Confirms, then re-seeds `slotly.v1`. Leaves `slotly.ui` alone. |
 
-The two toggles use `aria-pressed` and persist in `localStorage` under **`slotly.ui`** — a
-separate key from the demo data, so **Reset demo data** does not disturb the chrome. Both
+The two chrome controls use `aria-pressed` and persist in `localStorage` under **`slotly.ui`**
+— a separate key from the demo data, so **Reset demo data** does not disturb the chrome. Both
 links carry `target="_blank" rel="noopener noreferrer"` and an `aria-label` that says they
-open in a new tab. In rail mode every one of these collapses to its icon, with the label
-still on `title` and `aria-label`.
+open in a new tab. In rail mode every footer control collapses to its icon in one column,
+with the label still on `title` and `aria-label`.
 
 ### The yellow sidebar is the default
 
@@ -285,7 +297,7 @@ white card, and the footer buttons sit on a translucent white. **Never white tex
 | `.side[data-tone="amber"] .side__sub` → `--ink-2` | The author line is ours, so it follows the same AA rule as the kit's quiet text instead of staying `--faint` grey on yellow. |
 | `.side[data-tone="amber"] .navlink.is-active:hover` pinned to `--bg` | The generic hover tint only muddied the white active card. |
 | `.sitelink` on `--night` with white type | The one inverted element in the sidebar. It stands out against yellow without adding a colour that is not already a token, and it still reads on the white sidebar. Hover goes to `--night-2`. |
-| `.srclink` with a `--line-2` border | An outline control, deliberately not a second dark one — one inverted element in the footer is a focal point, two is a pattern. On yellow it takes the same translucent white ground as the toggle buttons beside it. |
+| `.side__pair .navlink:not(.sitelink)` with a `--line-2` border | Everything sharing a paired row reads as a control rather than a nav row, so it takes a hairline — deliberately not a second dark one, because one inverted element in the footer is a focal point and two is a pattern. On yellow they take a translucent white ground. |
 
 Both tones and the rail were checked in a browser at 1280px and 390px.
 
@@ -312,13 +324,15 @@ and the right home-screen name.
 `main.js` wires it up in one call:
 
 ```js
-initPWA({ mount: installHost, appName: 'Slotly', onNote: (msg) => toast(msg) });
+initPWA({ mount: installRow, appName: 'Slotly', onNote: (msg) => toast(msg) });
 ```
 
-`mount` is an empty `div.side__install` sitting between the sidebar toggles and the author
-line, so the button lands beside the other footer controls and the host collapses to nothing
-while the button is hidden. `onNote` goes through the app's own `toast`, so the iOS
-instructions and the "install dismissed" note look like every other message in the app.
+`mount` is the last `.side__pair` row in the footer, the one holding **Reset demo data**.
+`initPWA` appends, so `main.js` moves the returned control to the head of the row; while the
+button is hidden `[hidden]{display:none!important}` takes it out of the flex row entirely and
+Reset spans the row on its own, so nothing shifts on browsers that never offer an install.
+`onNote` goes through the app's own `toast`, so the iOS instructions and the "install
+dismissed" note look like every other message in the app.
 
 **The `SHELL` array in `sw.js` is the one thing to maintain.** It lists this app's own files
 explicitly — `./`, `./index.html`, the manifest, both stylesheets, all three `lib` modules,

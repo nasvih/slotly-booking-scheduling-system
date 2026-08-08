@@ -71,12 +71,14 @@ behind the `DEMO` pill in the topbar.
 | **Customers** | Visit history and no-show rate per customer, sortable, with a reminder-call filter for anyone at 25% or above. Detail drawer with a 16-booking outcome strip, a desk note and full history. CSV export. |
 | **Settings** | Desk name, opening and closing time, slot length, closed days, token prefix. Three message templates with `{{name}}`-style placeholders, insertable placeholder chips and a live preview rendered against a real booking. Demo data counts and the reset action. |
 
-The sidebar is the brand yellow by default, with ink text on it. Two controls in its footer
-switch it to plain white and collapse it to a 64px icon rail; both choices persist under
-their own `slotly.ui` key, separate from the demo data. The footer also holds **Reset demo
-data**, **About this demo**, a link to nasvih.in, and — where the browser offers it — an
-**Install app** button. The assistant has a single entry point: the round launcher at the
-bottom right, or `⌘K` / `Ctrl+K`.
+The sidebar is the brand yellow by default, with ink text on it. Two icon-only controls sit on
+the brand row at the top, right of the name: a circle half filled switches between yellow and
+plain white (labelled *Sidebar colour* — it names no colour, and `aria-pressed` carries the
+tone), and a panel with a chevron collapses the sidebar to a 64px icon rail. Both choices
+persist under their own `slotly.ui` key, separate from the demo data. The footer below holds
+**About this demo** across the top, then nasvih.in beside **Source on GitHub**, then **Reset
+demo data** — joined by an **Install app** button where the browser offers one. The assistant
+has a single entry point: the round launcher at the bottom right, or `⌘K` / `Ctrl+K`.
 
 Three flows that persist through `localStorage`: **booking** (calendar or dialog → blocks the
 slot → appears in Today), **queue state changes** (call / serve / done / no-show / undo),

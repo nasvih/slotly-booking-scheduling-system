@@ -134,11 +134,12 @@ const demoPill = h('button', {
 }, 'Demo');
 demoPill.addEventListener('click', aboutModal);
 
-sideEl.appendChild(h('div', { class: 'side__brand' },
+const brandEl = h('div', { class: 'side__brand' },
   h('span', { class: 'mark' }, 'SL'),
-  h('div', {},
+  h('div', { style: 'min-width:0' },
     h('div', { class: 'side__name' }, 'slotly'),
-    h('div', { class: 'side__tag' }, 'Booking desk'))));
+    h('div', { class: 'side__tag' }, 'Booking desk')));
+sideEl.appendChild(brandEl);
 sideEl.appendChild(navEl);
 
 const resetBtn = h('button', { class: 'navlink', title: 'Reset demo data', 'aria-label': 'Reset demo data', html: `${icon('refresh')}<span>Reset demo data</span>` });
@@ -202,53 +203,64 @@ else if (ui.tone !== 'amber') ui.tone = 'plain';
    off-canvas drawer, so the class is simply never applied there. */
 const wide = window.matchMedia('(min-width:901px)');
 
+/* Both controls sit on the brand row, right of the name, and show a glyph and
+   nothing else — the kit clips their span. So the glyphs have to carry the
+   meaning: a panel with a chevron pointing at the edge the sidebar is about to
+   move to, and a circle half filled for the colour. Stroke SVG on
+   currentColor, like every other icon in the app. */
+const RAIL_GLYPH = {
+  collapse: '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.75" y="3.75" width="14.5" height="12.5" rx="2"/><path d="M8 3.75v12.5"/><path d="M13.6 7.9L11.5 10l2.1 2.1"/></svg>',
+  expand: '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.75" y="3.75" width="14.5" height="12.5" rx="2"/><path d="M8 3.75v12.5"/><path d="M11.5 7.9L13.6 10l-2.1 2.1"/></svg>',
+};
+const TONE_GLYPH = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.6"/><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2z" fill="currentColor" stroke="none"/></svg>';
+/* the colour control names no colour at all: the glyph carries it and
+   aria-pressed reports whether the yellow tone is on */
+const TONE_LABEL = 'Sidebar colour';
+
 const railBtn = h('button', {
   class: 'btn btn--sm',
   type: 'button',
   'data-act': 'rail',
-  html: `${icon('arrowRight')}<span>Collapse</span>`,
+  html: `${RAIL_GLYPH.collapse}<span>Collapse sidebar</span>`,
 });
 const toneBtn = h('button', {
   class: 'btn btn--sm',
   type: 'button',
   'data-act': 'tone',
-  html: `${icon('spark')}<span>Colour</span>`,
+  title: TONE_LABEL,
+  'aria-label': TONE_LABEL,
+  html: `${TONE_GLYPH}<span>${TONE_LABEL}</span>`,
 });
+brandEl.appendChild(h('div', { class: 'side__brandbtns' }, railBtn, toneBtn));
 
 function applyChrome() {
   const rail = !!ui.rail && wide.matches;
   shellEl.classList.toggle('is-rail', rail);
+  const railLabel = ui.rail ? 'Expand sidebar' : 'Collapse sidebar';
   railBtn.setAttribute('aria-pressed', String(!!ui.rail));
-  railBtn.setAttribute('aria-label', ui.rail ? 'Expand sidebar' : 'Collapse sidebar to icons');
-  railBtn.title = ui.rail ? 'Expand sidebar' : 'Collapse sidebar to icons';
-  railBtn.querySelector('svg').style.transform = ui.rail ? '' : 'rotate(180deg)';
-  railBtn.querySelector('span').textContent = ui.rail ? 'Expand' : 'Collapse';
+  railBtn.setAttribute('aria-label', railLabel);
+  railBtn.title = railLabel;
+  railBtn.innerHTML = `${ui.rail ? RAIL_GLYPH.expand : RAIL_GLYPH.collapse}<span>${railLabel}</span>`;
 
   const amber = ui.tone === 'amber';
   if (amber) sideEl.setAttribute('data-tone', 'amber');
   else sideEl.removeAttribute('data-tone');
   toneBtn.setAttribute('aria-pressed', String(amber));
-  const toneLabel = amber ? 'Use the white sidebar' : 'Use the brand yellow sidebar';
-  toneBtn.setAttribute('aria-label', toneLabel);
-  toneBtn.title = toneLabel;
-  /* the button names the move, not the state — same as Collapse/Expand, and it
-     keeps the toggle readable without relying on the colour alone */
-  toneBtn.querySelector('span').textContent = amber ? 'White' : 'Yellow';
 }
 
 railBtn.addEventListener('click', () => { ui.rail = !ui.rail; saveUI(); applyChrome(); });
 toneBtn.addEventListener('click', () => { ui.tone = ui.tone === 'amber' ? 'plain' : 'amber'; saveUI(); applyChrome(); });
 wide.addEventListener('change', applyChrome);
 
-const installHost = h('div', { class: 'side__install' });
+/* Footer: About across the top, then the two links, then install and reset.
+   The paired rows share their width and truncate rather than overflow; the kit
+   stacks them back into a single column in the rail. */
+const installRow = h('div', { class: 'side__pair' }, resetBtn);
 
 sideEl.appendChild(h('div', { class: 'side__foot' },
-  resetBtn,
   aboutBtn,
-  siteLink,
-  srcLink,
-  h('div', { class: 'side__toggles', style: 'margin-top:10px' }, railBtn, toneBtn),
-  installHost,
+  h('div', { class: 'side__pair' }, siteLink, srcLink),
+  installRow,
   h('div', { class: 'side__sub small faint', style: 'padding:10px 10px 2px;line-height:1.5' },
     'Demo build by ',
     h('a', { class: 'linkish', href: 'https://www.nasvih.in', target: '_blank', rel: 'noopener' }, 'Muhammed Nasvih V'))));
@@ -269,11 +281,14 @@ applyChrome();
 /* ---------- installable ---------- */
 /* Registers the service worker and adds an "Install app" control to the sidebar
    footer, but only when the browser says installing is actually possible. */
-initPWA({
-  mount: installHost,
+/* initPWA appends, so its control is moved to the head of the row it shares
+   with Reset. Hidden it is display:none, so the row never leaves a gap. */
+const installBtn = initPWA({
+  mount: installRow,
   appName: 'Slotly',
   onNote: (msg) => toast(msg),
 });
+if (installBtn) installRow.insertBefore(installBtn, installRow.firstChild);
 
 /* ---------- context handed to every view ---------- */
 let current = 'today';

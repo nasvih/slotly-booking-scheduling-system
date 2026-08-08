@@ -139,9 +139,23 @@ button.pill:hover{border-color:var(--amber)}
 .side[data-tone="amber"] .side__sub{color:var(--ink-2)}
 .side[data-tone="amber"] .side__sub .linkish{border-bottom-color:var(--ink-2)}
 
+/* The footer is About on its own, then two paired rows. Everything inside a
+   pair is a control rather than a nav row, so it carries a hairline — except
+   the one dark link, which keeps its inverted ground. The rows supply their
+   own vertical rhythm, so no member carries a margin of its own. */
+.side__foot .side__pair{margin-top:6px}
+.side__pair .navlink:not(.sitelink){border:1px solid var(--line-2)}
+.side__pair .navlink:not(.sitelink):hover{background:var(--hover);border-color:var(--amber-line)}
+.side[data-tone="amber"] .side__pair .navlink:not(.sitelink){background:rgba(255,255,255,.72);border-color:rgba(23,24,26,.24)}
+.side[data-tone="amber"] .side__pair .navlink:not(.sitelink) svg{color:var(--ink-2)}
+.side[data-tone="amber"] .side__pair .navlink:not(.sitelink):hover{background:var(--bg)}
+/* a paired label truncates rather than pushing its neighbour out of the row */
+.side__pair .navlink{min-width:0;gap:7px;padding:8px}
+.side__pair .navlink span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 /* the one dark element in the sidebar. Ink ground, white type — 16:1 either way,
    and it reads as deliberate against the yellow rather than as a hole in it. */
-.sitelink{background:var(--night);color:#FFFFFF;margin-top:4px}
+.sitelink{background:var(--night);color:#FFFFFF}
 .sitelink svg{color:#FFFFFF}
 .sitelink:hover{background:var(--night-2);color:#FFFFFF}
 /* the kit's amber rules repaint every .navlink, so the dark one opts back out */
@@ -151,16 +165,7 @@ button.pill:hover{border-color:var(--amber)}
 
 /* the source link is an outline control, not a second inverted one — the
    nasvih.in link stays the only dark element in the footer */
-.srclink{border:1px solid var(--line-2);margin-top:6px}
-.srclink:hover{background:var(--hover);border-color:var(--amber-line)}
-.side[data-tone="amber"] .srclink{background:rgba(255,255,255,.72);border-color:rgba(23,24,26,.24)}
-.side[data-tone="amber"] .srclink svg{color:var(--ink-2)}
-.side[data-tone="amber"] .srclink:hover{background:var(--bg)}
-
-/* the install control only exists when the browser offers it, so the host must
-   collapse to nothing rather than leave a margin behind */
-.side__install{display:grid}
-.side__install .pwa-install{margin-top:6px}
+.srclink svg{color:var(--ink-2)}
 
 /* the active row is white on yellow; a hover tint over it only muddies the state */
 .side[data-tone="amber"] .navlink.is-active:hover{background:var(--bg)}
@@ -172,7 +177,7 @@ button.pill:hover{border-color:var(--amber)}
 @media (max-width:900px){
   /* rail mode is a desktop concern: under 900px the sidebar is already an
      off-canvas drawer, so the collapse control is not offered at all */
-  .side__toggles [data-act="rail"]{display:none}
+  .side__brandbtns [data-act="rail"]{display:none}
 }
 @media (max-width:640px){
   .fieldrow{grid-template-columns:minmax(0,1fr)}
