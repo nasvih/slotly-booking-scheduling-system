@@ -11,6 +11,28 @@ no backend. It runs from any static file server and from GitHub Pages unchanged.
 
 ---
 
+## What this is
+
+Slotly runs a front desk. Booked appointments and walk-in tokens sit in the same queue on the
+same day, a week calendar shows every staff member side by side, and each service carries its
+own duration and buffer so the diary reflects how long the work actually takes. Every booking
+has a confirmation message written from a template.
+
+## Where it helps a business
+
+- The diary stops being a paper book that only one person can read.
+- Double-booking becomes impossible — the slot is held the moment it is taken.
+- Walk-ins get a token instead of a crowd at the counter.
+- No-show patterns become visible per customer instead of being felt.
+- Staff hours, breaks and days off are part of the booking rules, not something the
+  receptionist has to remember.
+
+## How it would work for real
+
+The same interface, with browser storage swapped for a real database, staff accounts behind a
+login, and confirmations actually sent by message or email. What you are looking at is the
+interface and the workflow, not the production system behind them.
+
 ## How this demo works
 
 **You can actually use it.** Every screen is live. Book a slot, move it, cancel it, call a
@@ -26,7 +48,7 @@ sync between browsers or devices.
 app's own demo data. It is a demonstration of the interaction, not a connected model, and no
 request leaves your browser.
 
-The same three points are in the app, under **About this demo** in the sidebar footer and
+The same four blocks are in the app, under **About this demo** in the sidebar footer and
 behind the `DEMO` pill in the topbar.
 
 ---
@@ -43,10 +65,12 @@ behind the `DEMO` pill in the topbar.
 | **Customers** | Visit history and no-show rate per customer, sortable, with a reminder-call filter for anyone at 25% or above. Detail drawer with a 16-booking outcome strip, a desk note and full history. CSV export. |
 | **Settings** | Desk name, opening and closing time, slot length, closed days, token prefix. Three message templates with `{{name}}`-style placeholders, insertable placeholder chips and a live preview rendered against a real booking. Demo data counts and the reset action. |
 
-The sidebar collapses to a 64px icon rail and switches to the brand yellow from two controls
-in its footer; both choices persist under their own `slotly.ui` key, separate from the demo
-data. The assistant has a single entry point — the round launcher at the bottom right, or
-`⌘K` / `Ctrl+K`.
+The sidebar is the brand yellow by default, with ink text on it. Two controls in its footer
+switch it to plain white and collapse it to a 64px icon rail; both choices persist under
+their own `slotly.ui` key, separate from the demo data. The footer also holds **Reset demo
+data**, **About this demo**, a link to nasvih.in, and — where the browser offers it — an
+**Install app** button. The assistant has a single entry point: the round launcher at the
+bottom right, or `⌘K` / `Ctrl+K`.
 
 Three flows that persist through `localStorage`: **booking** (calendar or dialog → blocks the
 slot → appears in Today), **queue state changes** (call / serve / done / no-show / undo),
@@ -67,6 +91,21 @@ Then open <http://localhost:4102>.
 
 Any static server works just as well (`npx serve`, `php -S`, nginx, Caddy).
 
+## Install it
+
+Slotly is a progressive web app. Over HTTPS (or `localhost`) the browser offers to install it,
+and an **Install app** button appears in the sidebar footer at the same moment — on iPhone and
+iPad, where there is no install prompt, the button explains the **Share → Add to Home Screen**
+route instead. Installed, it opens in its own window with no browser chrome.
+
+A service worker (`sw.js`) caches the whole app shell on first load — every stylesheet, every
+module, the icons and the manifest — so a reload works with no connection at all. There is
+nothing to sync, because the data was never on a server in the first place.
+
+If you change, add or remove a file, add it to the `SHELL` array in `sw.js` and bump
+`CACHE_VERSION`. A file that is missing from the list will not be there offline; a file listed
+that does not exist fails the whole install.
+
 ## Deploy to GitHub Pages
 
 1. Push the repository to GitHub.
@@ -84,12 +123,16 @@ the repository.
 
 | Path | Purpose |
 |---|---|
-| `index.html` | The single page. Fonts, stylesheets, `<noscript>` line, module entry. |
+| `index.html` | The single page. Fonts, stylesheets, manifest link, `<noscript>` line, module entry. |
+| `manifest.webmanifest` | Web app manifest: name, icons, `standalone` display, `#EAC81C` theme colour. |
+| `sw.js` | Service worker. Caches the shell listed in `SHELL` so the app opens offline. |
 | `assets/app.css` | Shared product design system: tokens, shell, buttons, tables, forms, modal, assistant. Unmodified. |
-| `assets/slotly.css` | App-specific components only — queue rows, calendar grid, slot picker, staff cards, template preview. |
+| `assets/slotly.css` | App-specific components only — queue rows, calendar grid, slot picker, staff cards, template preview, sidebar footer. |
+| `assets/icons/` | Install icons: 192, 512 and a 512 maskable. |
 | `lib/ui.js` | DOM helpers, formatting, seeded random, `createStore`, hash router, toast, modal, confirm, CSV, bar chart, meter, icons. |
 | `lib/assistant.js` | The assistant engine: intent routing, word-by-word streaming, panel and launcher. |
-| `src/main.js` | Boot: store, shell, nav, router, keyboard shortcuts, about modal, assistant mount. |
+| `lib/pwa.js` | Service worker registration and the install control. |
+| `src/main.js` | Boot: store, shell, nav, router, keyboard shortcuts, about modal, assistant mount, install control. |
 | `src/data.js` | Seeded dataset and every scheduling calculation — availability, utilisation, no-show rates, templates. |
 | `src/agent.js` | The twelve *Slotly Desk* intents, each reading live store state. |
 | `src/booking.js` | The booking dialog, reschedule, cancel and status changes, shared by three views. |

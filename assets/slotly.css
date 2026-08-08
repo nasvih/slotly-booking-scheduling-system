@@ -117,10 +117,44 @@ button.pill:hover{border-color:var(--amber)}
 .stripe i.miss{background:var(--bad)}
 .stripe i.cut{background:var(--line-2)}
 
+/* == 7a. about modal ==
+   Short lines with a solid square marker, so the four blocks stay scannable
+   inside the modal at phone width. */
+.aboutlist{display:flex;flex-direction:column;gap:7px;margin-top:5px}
+.aboutlist li{position:relative;padding-left:16px;font-size:12.5px;line-height:1.55;color:var(--muted)}
+.aboutlist li::before{content:"";position:absolute;left:0;top:6px;width:6px;height:6px;border-radius:var(--r-xs);background:var(--amber-fill)}
+.aboutlist b{color:var(--ink-2);font-weight:600}
+
+/* == 7b. sidebar footer: site link + install ==
+   The yellow sidebar is the default here, so anything in the footer is read
+   against #EAC81C first and against white second. Ink on yellow, never white. */
+
 /* the kit tints muted sidebar text with --amber-darker; the author line is ours,
    so it follows the same rule instead of staying --faint grey on yellow */
 .side[data-tone="amber"] .side__sub{color:var(--amber-darker)}
 .side[data-tone="amber"] .side__sub .linkish{border-bottom-color:var(--amber-darker)}
+
+/* the one dark element in the sidebar. Ink ground, white type — 16:1 either way,
+   and it reads as deliberate against the yellow rather than as a hole in it. */
+.sitelink{background:var(--night);color:#FFFFFF;margin-top:4px}
+.sitelink svg{color:#FFFFFF}
+.sitelink:hover{background:var(--night-2);color:#FFFFFF}
+/* the kit's amber rules repaint every .navlink, so the dark one opts back out */
+.side[data-tone="amber"] .sitelink{color:#FFFFFF}
+.side[data-tone="amber"] .sitelink svg{color:#FFFFFF}
+.side[data-tone="amber"] .sitelink:hover{background:var(--night-2)}
+
+/* the install control only exists when the browser offers it, so the host must
+   collapse to nothing rather than leave a margin behind */
+.side__install{display:grid}
+.side__install .pwa-install{margin-top:6px}
+
+/* on yellow, the kit's amber focus ring is invisible. Ink reads at 10.8:1
+   against the fill and stays visible on the white active row and the dark link. */
+.side[data-tone="amber"] :focus-visible{outline-color:var(--ink)}
+
+/* the active row is white on yellow; a hover tint over it only muddies the state */
+.side[data-tone="amber"] .navlink.is-active:hover{background:var(--bg)}
 
 /* == 8. responsive == */
 @media (max-width:1080px){

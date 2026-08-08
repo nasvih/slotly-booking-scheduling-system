@@ -4,14 +4,41 @@ Architecture, data model, module map, how to extend it, keyboard shortcuts and d
 
 ---
 
-## What this demo is
+## What this is
+
+Slotly runs a front desk. Booked appointments and walk-in tokens sit in the same queue on the
+same day, a week calendar shows every staff member side by side, and each service carries its
+own duration and buffer so the diary reflects how long the work actually takes. Every booking
+has a confirmation message written from a template.
+
+## Where it helps a business
+
+- The diary stops being a paper book that only one person can read.
+- Double-booking becomes impossible — the slot is held the moment it is taken.
+- Walk-ins get a token instead of a crowd at the counter.
+- No-show patterns become visible per customer instead of being felt.
+- Staff hours, breaks and days off are part of the booking rules, not something the
+  receptionist has to remember.
+
+## How it would work for real
+
+The same interface, with browser storage swapped for a real database, staff accounts behind a
+login, and confirmations actually sent by message or email. What you are looking at is the
+interface and the workflow, not the production system behind them. In practice that means
+`createStore` becomes an API client, `staffFree` moves server-side so two receptionists cannot
+race for the same slot, and `renderTemplate` hands its output to a message gateway. The views
+would not change.
+
+## How this demo works
 
 **You can actually use it.** Every screen writes to the same store. Booking a slot blocks it
 on the calendar, puts a token in the Today queue and adds a row to Bookings. Nothing is
 read-only.
 
 **Your data stays on your machine.** State lives in `localStorage` under `slotly.v1`. There
-is no server, no account, no API. `fetch` is never called. Clearing browser data or pressing
+is no server, no account, no API, and no application code calls `fetch` — the only one in the
+repository is the service worker re-issuing requests the browser already made for this app's
+own files. Clearing browser data or pressing
 **Reset demo data** re-seeds from scratch. Nothing syncs between browsers or devices.
 
 **The assistant is simulated.** `Slotly Desk` matches your question against local intent
@@ -31,6 +58,7 @@ index.html
         ├── createStore('slotly.v1', seedState)      lib/ui.js
         ├── router({today, calendar, …}, onChange)   lib/ui.js
         ├── shell: sidebar + topbar + #viewhost
+        ├── initPWA({mount, appName, onNote})        lib/pwa.js → sw.js
         ├── buildAgent(ctx).mount(document.body)     src/agent.js
         └── draw() → VIEWS[current].render(ctx) → Node
 ```
@@ -128,6 +156,8 @@ Dates are never faked, only the time of day.
 |---|---|---|
 | `lib/ui.js` | `h`, `qs`, `qsa`, `on`, `esc`, `money`, `num`, `pct`, `fmtDate`, `fmtTime`, `ago`, `isoDay`, `daysFromNow`, `seeded`, `pick`, `between`, `createStore`, `router`, `toast`, `modal`, `confirmDialog`, `downloadCSV`, `barChart`, `meter`, `icon`, `ICONS` | everything |
 | `lib/assistant.js` | `Assistant` | `src/agent.js` |
+| `lib/pwa.js` | `initPWA` | `main.js` |
+| `sw.js` | — (service worker, registered by `lib/pwa.js`) | the browser |
 | `src/data.js` | seed, time helpers, lookups, availability, stats, templates | every view, `agent.js`, `booking.js` |
 | `src/booking.js` | `openBooking`, `openReschedule`, `cancelBooking`, `setStatus` | Today, Calendar, Bookings, Customers |
 | `src/drawer.js` | `drawer` | Bookings, Customers |
@@ -187,7 +217,13 @@ it extra keyword matches.
 **Change the schedule maths.** Everything routes through `staffFree`. Per-slot capacity above
 one, double-booking rules or room constraints all belong there, and every screen inherits them.
 
-**Never** add a dependency, a build step, a `fetch` call or a gradient.
+**Add a file.** Any new module, stylesheet or icon has to be added to the `SHELL` array in
+`sw.js` with `CACHE_VERSION` bumped in the same commit, or an installed copy will not have it
+when there is no connection.
+
+**Never** add a dependency, a build step, a `fetch` call to any host, or a gradient. The only
+`fetch` in the repository is inside `sw.js`, and it only ever re-issues a request the browser
+already made for one of these files.
 
 ---
 
@@ -204,23 +240,84 @@ one, double-booking rules or room constraints all belong there, and every screen
 
 Shortcuts are ignored while typing in an input, a textarea or a select.
 
-## Sidebar controls
+## Sidebar footer
 
-Two buttons sit in the sidebar footer, one click away from every screen.
+Everything that is not a screen lives in the sidebar footer, one click away from anywhere.
 
 | Control | Effect |
 |---|---|
+| **Reset demo data** | Confirms, then re-seeds `slotly.v1`. Leaves `slotly.ui` alone. |
+| **About this demo** | The four-block modal: what this is, where it helps, how it would work for real, how the demo works. Same content as the `DEMO` pill in the topbar. |
+| **nasvih.in** | Link to the author's site, `target="_blank" rel="noopener noreferrer"`, with an `aria-label` that says it opens in a new tab. |
 | **Collapse / Expand** | Toggles `is-rail` on the `.shell` element: a 64px icon rail with labels, group headings and counts hidden. Every nav link keeps a `title` and an `aria-label`, so the rail stays readable to a screen reader and on hover. |
-| **Colour** | Toggles `data-tone="amber"` on the `.side` element, switching the sidebar to the brand yellow with ink text. |
+| **White / Yellow** | Toggles `data-tone="amber"` on the `.side` element. The button names the move rather than the state, the way Collapse/Expand does, so the toggle is not signalled by colour alone. |
+| **Install app** | Added by `initPWA` and hidden until the browser fires `beforeinstallprompt` (or immediately on iOS, where no such event exists). |
 
-Both use `aria-pressed`. Both persist in `localStorage` under **`slotly.ui`** — a separate key
-from the demo data, so **Reset demo data** does not disturb the chrome.
+The two toggles use `aria-pressed` and persist in `localStorage` under **`slotly.ui`** — a
+separate key from the demo data, so **Reset demo data** does not disturb the chrome.
+
+### The yellow sidebar is the default
+
+`data-tone="amber"` is applied when **nothing is stored**. Only an explicit press of the
+colour control writes `{"tone":"plain"}` and gives the plain white sidebar back, so a fresh
+browser always opens yellow. Nothing is written on load — "no stored preference" stays
+literally true until the control is used.
+
+The kit already inks the yellow sidebar correctly: ink `#17181A` on `#EAC81C` is 10.8:1, the
+brand mark inverts to an ink tile, muted labels and counts go to `--amber-darker`, the active
+row becomes a solid white card and the footer buttons sit on a translucent white. Never white
+text on yellow. What the yellow default needed on top of that, all in `assets/slotly.css`:
+
+| Fix | Why |
+|---|---|
+| `.side[data-tone="amber"] :focus-visible{outline-color:var(--ink)}` | The kit's focus ring is `--amber`, which is invisible on the amber fill. Ink reads on the yellow, on the white active row and on the dark site link alike. |
+| `.side[data-tone="amber"] .side__sub` → `--amber-darker` | The author line was `--faint` grey, which is a muddy read on yellow. |
+| `.side[data-tone="amber"] .navlink.is-active:hover` pinned to `--bg` | The generic hover tint only muddied the white active card. |
+| `.sitelink` on `--night` with white type | The one dark element in the sidebar. It stands out against yellow without adding a colour that is not already a token, and it still reads on the white sidebar. Hover goes to `--night-2`. |
+
+Both tones and the rail were checked in a browser at 1280px and 390px.
 
 Rail mode is a desktop concern. Under 900px the sidebar is already an off-canvas drawer, so
 the `is-rail` class is never applied there (guarded by a `matchMedia('(min-width:901px)')`
 check that also re-runs on resize) and the collapse control is hidden by CSS. The open drawer
 covers the menu button, so it closes on an outside click and on `Escape` as well as on
 navigation.
+
+## Installable (PWA)
+
+Three files, no build step and no dependency.
+
+| File | Job |
+|---|---|
+| `manifest.webmanifest` | `name`/`short_name` **Slotly**, one-line description, `start_url` and `scope` both `./` so it works from a Pages subdirectory, `display: standalone`, `background_color: #FFFFFF`, `theme_color: #EAC81C`, `lang: en`, categories, and three icons — 192 and 512 as `purpose: "any"`, plus a 512 as `purpose: "maskable"` for Android's shaped icons. |
+| `sw.js` | Cache-first service worker over one versioned cache keyed on the registration scope. `install` pre-caches `SHELL`, `activate` deletes every older cache under the same scope and claims open clients, `fetch` serves same-origin assets from cache and falls back to `./index.html` for navigations so a reload works offline. |
+| `lib/pwa.js` | Registers the worker on `load`, captures `beforeinstallprompt`, and drives the **Install app** control. |
+
+`index.html` carries `<link rel="manifest">`, `<meta name="theme-color" content="#EAC81C">`,
+an `apple-touch-icon` and the `apple-mobile-web-app-*` pair that gives iOS a standalone window
+and the right home-screen name.
+
+`main.js` wires it up in one call:
+
+```js
+initPWA({ mount: installHost, appName: 'Slotly', onNote: (msg) => toast(msg) });
+```
+
+`mount` is an empty `div.side__install` sitting between the sidebar toggles and the author
+line, so the button lands beside the other footer controls and the host collapses to nothing
+while the button is hidden. `onNote` goes through the app's own `toast`, so the iOS
+instructions and the "install dismissed" note look like every other message in the app.
+
+**The `SHELL` array in `sw.js` is the one thing to maintain.** It lists this app's own files
+explicitly — `./`, `./index.html`, the manifest, both stylesheets, all three `lib` modules,
+all eleven `src` modules and the three icons. `addAll` is atomic: one file that 404s fails the
+whole install and the app is then not available offline, and one file left off the list is
+simply missing when there is no connection. Add or rename a file, update `SHELL` and bump
+`CACHE_VERSION` in the same commit.
+
+The worker never invents a network call — the app has none. The only cross-origin requests are
+the Google Fonts stylesheet and its `woff2` files, which the worker caches opportunistically as
+they are requested, so an installed copy keeps its typography offline.
 
 ## The assistant has exactly one entry point
 
