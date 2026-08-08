@@ -3,7 +3,8 @@
 import { h, icon, pct } from '../../lib/ui.js';
 import {
   todayKey, weekStart, addDays, parseDay, dayLabel, hm12, gridSlots, toMin, deskNowMin,
-  isOpenDay, freeStaffAt, staffWorks, nextAvailable, svcOf, staffOf, custOf, tokenLabel, utilisation, DOW,
+  isOpenDay, freeStaffAt, staffWorks, nextAvailable, svcOf, staffOf, custOf, tokenLabel, utilisation,
+  blocksOn, DOW,
 } from '../data.js';
 import { openBooking } from '../booking.js';
 
@@ -124,6 +125,10 @@ export default function renderCalendar(ctx) {
         && pool.some((p) => p.id === b.staffId));
       const freeIds = freeStaffAt(state, d, time, serviceFilter).filter((id) => pool.some((p) => p.id === id));
       const past = d < today || (d === today && start + slotMin <= nowMin);
+      /* time the desk has held back for a staff member — not a booking, but
+         the slot is gone all the same, so the grid has to say so */
+      const held = pool.filter((st) => staffWorks(state, st.id, d)
+        && blocksOn(state, st.id, d).some((x) => toMin(x.start) < start + slotMin && toMin(x.end) > start));
 
       let cls = 'cal__cell';
       if (!isOpenDay(state, d) || !onShift) cls += ' cal__cell--shut';
@@ -135,12 +140,14 @@ export default function renderCalendar(ctx) {
         class: cls,
         'aria-label': freeIds.length && !past
           ? `Book ${svc.name} on ${dayLabel(d)} at ${hm12(time)}`
-          : `${dayLabel(d)} ${hm12(time)} — ${evs.length} booked, no room`,
+          : `${dayLabel(d)} ${hm12(time)} — ${evs.length} booked${held.length ? `, held back for ${held.map((st) => st.name).join(' and ')}` : ''}, no room`,
         disabled: !(freeIds.length && !past) ? true : null,
       });
 
       if (!isOpenDay(state, d)) cell.appendChild(h('span', { class: 'cal__shut' }, 'Closed'));
       else if (!onShift && !evs.length) cell.appendChild(h('span', { class: 'cal__shut' }, 'Off'));
+      held.forEach((st) => cell.appendChild(h('div', { class: 'cal__ev cal__ev--held' },
+        h('b', {}, `Held · ${st.initials}`), 'Kept off the grid')));
 
       evs.slice(0, 2).forEach((b) => {
         cell.appendChild(h('div', { class: `cal__ev cal__ev--${b.staffId}${b.status === 'no-show' ? ' cal__ev--off' : ''}` },

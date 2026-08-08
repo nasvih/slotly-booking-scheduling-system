@@ -4,9 +4,12 @@
 
 import { h, qs, icon, createStore, router, toast, modal, confirmDialog } from '../lib/ui.js';
 import { initPWA } from '../lib/pwa.js';
-import { STORE_KEY, seedState, todayKey, liveOn, OPEN_STATUSES } from './data.js';
+import { STORE_KEY, seedState, ensureShape, todayKey, liveOn, OPEN_STATUSES } from './data.js';
 import { buildAgent } from './agent.js';
 import { openBooking } from './booking.js';
+import { ACTION_EXAMPLES } from './actions.js';
+import { mountBell } from './notify.js';
+import { themeToggle, deviceControls, applyTheme, readTheme, IS_FRAMED } from './chrome.js';
 
 import renderToday from './views/today.js';
 import renderCalendar from './views/calendar.js';
@@ -16,7 +19,14 @@ import renderStaff from './views/staff.js';
 import renderCustomers from './views/customers.js';
 import renderSettings from './views/settings.js';
 
+/* The theme is read before anything is drawn — index.html sets it inline so
+   there is no white flash, and this keeps the two in step. */
+applyTheme(readTheme());
+
 const store = createStore(STORE_KEY, seedState);
+/* A state saved by an earlier build has no staff time-off list. */
+ensureShape(store.state);
+store.subscribe((s) => ensureShape(s));
 
 const VIEWS = [
   { id: 'today', label: 'Today', icon: 'clock', group: 'Desk', title: 'Today', sub: 'Live queue', render: renderToday },
@@ -57,7 +67,14 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && sideEl.classList.contains('is-open')) setDrawer(false);
 });
 
-const newBtn = h('button', { class: 'btn btn--primary', html: `${icon('plus')}<span>New booking</span>` });
+/* Its label is hidden at phone width, so the accessible name is carried on the
+   button itself rather than by the span the stylesheet takes away. */
+const newBtn = h('button', {
+  class: 'btn btn--primary',
+  'aria-label': 'New booking',
+  title: 'New booking',
+  html: `${icon('plus')}<span>New booking</span>`,
+});
 newBtn.addEventListener('click', () => openBooking(ctx, {}));
 
 const REPO_URL = 'https://github.com/nasvih/slotly-booking-scheduling-system';
@@ -84,6 +101,11 @@ const ABOUT = [
   {
     title: 'How it would work for real',
     text: 'The same interface, with browser storage swapped for a real database, staff accounts behind a login, and confirmations actually sent by message or email. What you are looking at is the interface and the workflow, not the production system behind them.',
+  },
+  {
+    title: 'What the assistant can change',
+    text: 'Slotly Desk answers questions, and it also does the work. Type the request in plain words: it shows you exactly which record it read, and writes nothing until you press the button on its reply.',
+    examples: ACTION_EXAMPLES,
   },
   {
     title: 'How this demo works',
@@ -121,17 +143,25 @@ function aboutModal() {
         Array.isArray(line)
           ? h('li', {}, h('b', {}, line[0]), ' ', line[1])
           : h('li', {}, line)
-      ))) : null))),
+      ))) : null,
+      /* input on one line, what comes back under it — the same pairs the
+         assistant prints for "What can you do?" */
+      block.examples ? h('div', { class: 'exlist' }, block.examples.map((e) => h('div', { class: 'exrow' },
+        h('div', { class: 'exrow__t' }, e.title),
+        h('code', { class: 'exrow__in' }, e.input),
+        h('p', { class: 'exrow__out small muted' }, e.output)))) : null))),
     actions: [{ label: 'Got it', class: 'btn--primary' }],
   });
 }
 
+/* The topbar's demo marker is the way into the modal, so it says what it does
+   rather than just flagging the build. */
 const demoPill = h('button', {
-  class: 'pill pill--amber',
+  class: 'pill pill--amber aboutpill',
   type: 'button',
   'aria-label': 'About this demo',
   title: 'Everything here is sample data held in this browser. Nothing is sent anywhere.',
-}, 'Demo');
+}, 'About this demo');
 demoPill.addEventListener('click', aboutModal);
 
 const brandEl = h('div', { class: 'side__brand' },
@@ -156,9 +186,6 @@ resetBtn.addEventListener('click', async () => {
   toast('Demo data reset', 'ok');
 });
 
-const aboutBtn = h('button', { class: 'navlink', title: 'About this demo', 'aria-label': 'About this demo', html: `${icon('eye')}<span>About this demo</span>` });
-aboutBtn.addEventListener('click', () => { setDrawer(false); aboutModal(); });
-
 /* The one dark element in the sidebar: it has to stand out against the yellow
    default without introducing a colour that is not already in the tokens. */
 const EXTERNAL = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 11.5v4a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1h4"/><path d="M11.5 3.5h5v5"/><path d="M9 11l7.5-7.5"/></svg>';
@@ -180,9 +207,9 @@ const srcLink = h('a', {
   href: REPO_URL,
   target: '_blank',
   rel: 'noopener noreferrer',
-  title: 'Source on GitHub — opens in a new tab',
-  'aria-label': 'Source on GitHub — opens in a new tab',
-  html: `${CODE}<span>Source on GitHub</span>`,
+  title: 'GitHub — opens in a new tab',
+  'aria-label': 'GitHub — opens in a new tab',
+  html: `${CODE}<span>GitHub</span>`,
 });
 
 /* ---------- sidebar preferences (own key, untouched by "Reset demo data") ---------- */
@@ -252,27 +279,33 @@ railBtn.addEventListener('click', () => { ui.rail = !ui.rail; saveUI(); applyChr
 toneBtn.addEventListener('click', () => { ui.tone = ui.tone === 'amber' ? 'plain' : 'amber'; saveUI(); applyChrome(); });
 wide.addEventListener('change', applyChrome);
 
-/* Footer: About across the top, then the two links, then install and reset.
+/* Footer: the two links, then install and reset. About moved to the topbar,
+   where it sits next to the demo marker it explains.
    The paired rows share their width and truncate rather than overflow; the kit
    stacks them back into a single column in the rail. */
 const installRow = h('div', { class: 'side__pair' }, resetBtn);
 
 sideEl.appendChild(h('div', { class: 'side__foot' },
-  aboutBtn,
   h('div', { class: 'side__pair' }, siteLink, srcLink),
   installRow,
   h('div', { class: 'side__sub small faint', style: 'padding:10px 10px 2px;line-height:1.5' },
     'Demo build by ',
     h('a', { class: 'linkish', href: 'https://www.nasvih.in', target: '_blank', rel: 'noopener' }, 'Muhammed Nasvih V'))));
 
+/* The three chrome controls are icon-only and sit together, so they read as one
+   group of browser-level switches rather than as desk actions. They are filled
+   in after the view context exists. */
+const toolsEl = h('div', { class: 'topbar__tools' });
+
 const shellEl = h('div', { class: 'shell' },
   sideEl,
   h('div', { class: 'main' },
     h('header', { class: 'topbar' },
       menuBtn,
-      h('div', { style: 'min-width:0' }, titleEl, subEl),
+      h('div', { class: 'topbar__id' }, titleEl, subEl),
       h('div', { class: 'spacer' }),
       demoPill,
+      toolsEl,
       newBtn),
     viewHost));
 app.appendChild(shellEl);
@@ -300,6 +333,14 @@ const ctx = {
   params: [],
   query: new URLSearchParams(''),
 };
+
+/* ---------- topbar controls ---------- */
+/* Notifications first, then the device preview, then light/dark — read order
+   goes from "what needs me" to "how am I looking at it". Inside the phone
+   frame the preview control is left out: previewing a preview is nonsense. */
+toolsEl.appendChild(mountBell(ctx));
+if (!IS_FRAMED) toolsEl.appendChild(deviceControls({ appName: 'slotly' }));
+toolsEl.appendChild(themeToggle());
 
 /* ---------- nav ---------- */
 function counts() {

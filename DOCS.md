@@ -46,6 +46,11 @@ rules and answers with numbers read out of the live store. It is a demonstration
 interaction, not a connected model, and no request leaves the browser. The panel footer says
 so on every screen.
 
+**The assistant also writes.** Seven of its nineteen intents propose a change to the store —
+booking, rescheduling, cancelling, running the queue, holding staff time, changing a service —
+and apply it when the reader presses the button on the answer. Nothing is ever mutated on the
+strength of a sentence alone.
+
 ---
 
 ## Architecture
@@ -55,13 +60,21 @@ One page, hash routed, no build step.
 ```
 index.html
   └── src/main.js                 boot
+        ├── applyTheme(readTheme())                  src/chrome.js
         ├── createStore('slotly.v1', seedState)      lib/ui.js
+        ├── ensureShape(store.state)                 src/data.js
         ├── router({today, calendar, …}, onChange)   lib/ui.js
         ├── shell: sidebar + topbar + #viewhost
+        ├── topbar: mountBell(ctx)                   src/notify.js
+        │           deviceControls(), themeToggle()  src/chrome.js
         ├── initPWA({mount, appName, onNote})        lib/pwa.js → sw.js
-        ├── buildAgent(ctx).mount(document.body)     src/agent.js
+        ├── buildAgent(ctx).mount(document.body)     src/agent.js + src/actions.js
         └── draw() → VIEWS[current].render(ctx) → Node
 ```
+
+`index.html` sets `data-theme` in a four-line inline script before the first paint, so the
+page never flashes white on the way into dark mode. `src/chrome.js` owns the same
+`slotly.theme` key and takes over from there.
 
 `main.js` owns a single `ctx` object handed to every view:
 
@@ -127,6 +140,19 @@ The **block** a booking occupies is `durationMin + bufferMin`.
 
 `cancelled` and `no-show` bookings release their slot; the other four hold it.
 
+### `blocks[]`
+
+Time a staff member is held back from booking, written by the assistant's *hold back staff
+time* action and released from the staff card.
+
+`id`, `staffId`, `date`, `start`, `end`, `reason`, `at`.
+
+A block is not a booking: it has no customer, no token and no price. It is read by
+`staffFree` (so the calendar stops offering those slots) and by `shiftMinutes` (so utilisation
+does not count time nobody is available for). States saved by an earlier build have no
+`blocks` array at all, which is what `ensureShape(state)` in `src/data.js` is for — `main.js`
+runs it on boot and on every store update.
+
 ### Scheduling functions — all in `src/data.js`
 
 | Function | Answers |
@@ -134,7 +160,9 @@ The **block** a booking occupies is `durationMin + bufferMin`.
 | `gridSlots(state)` | The list of grid times for a day. |
 | `isOpenDay(state, key)` | Is the desk open on that date. |
 | `staffWorks(state, id, key)` | Is that person rostered that day. |
-| `staffFree(state, id, key, start, block, ignoreId)` | Does the block fit the shift, miss the break and hit no booking. `ignoreId` excludes the record being moved. |
+| `staffFree(state, id, key, start, block, ignoreId)` | Does the block fit the shift, miss the break, clear any held period and hit no booking. `ignoreId` excludes the record being moved. |
+| `blocksOn(state, id, key)` / `blockedMinutes(state, id, key)` | Held periods for one person on one day, and their total. |
+| `addBlock(state, {staffId, date, start, end, reason})` | Holds a period back. Called inside a `store.update`. |
 | `freeStaffAt(state, key, time, serviceId, ignoreId)` | Who could take that service at that time. |
 | `freeSlots(state, key, serviceId, staffId, ignoreId)` | `[{time, staffIds}]` for a whole day. |
 | `nextAvailable(state, serviceId, staffId, fromKey)` | First bookable slot within 21 days. |
@@ -158,18 +186,24 @@ Dates are never faked, only the time of day.
 | `lib/assistant.js` | `Assistant` | `src/agent.js` |
 | `lib/pwa.js` | `initPWA` | `main.js` |
 | `sw.js` | — (service worker, registered by `lib/pwa.js`) | the browser |
-| `src/data.js` | seed, time helpers, lookups, availability, stats, templates | every view, `agent.js`, `booking.js` |
+| `src/data.js` | seed, `ensureShape`, time helpers, lookups, availability, held time, stats, templates | every view, `agent.js`, `actions.js`, `booking.js`, `notify.js`, `token.js` |
+| `src/parse.js` | `matchDay`, `matchService`, `matchStaff`, `withStaff`, `matchCustomer`, `bookingCustomer`, `matchTime`, `snapToGrid`, `matchBooking`, `matchWindow`, `matchNumber` | `agent.js`, `actions.js` |
+| `src/actions.js` | `actionIntents(ctx)`, `ACTION_EXAMPLES`, `ACTION_CHIPS` | `agent.js`, `main.js` (About modal) |
+| `src/token.js` | `openToken(ctx, booking, {title})`, `tokenButton(ctx, booking)` | `booking.js`, `actions.js`, Today, Bookings |
+| `src/notify.js` | `buildNotifications(state)`, `mountBell(ctx)` | `main.js` |
+| `src/chrome.js` | `readTheme`, `applyTheme`, `themeToggle`, `deviceControls`, `IS_FRAMED`, `THEME_KEY` | `main.js` |
 | `src/booking.js` | `openBooking`, `openReschedule`, `cancelBooking`, `setStatus` | Today, Calendar, Bookings, Customers |
 | `src/drawer.js` | `drawer` | Bookings, Customers |
-| `src/agent.js` | `buildAgent`, plus the `matchDay` / `matchService` / `matchStaff` / `matchCustomer` parsers | `main.js` |
+| `src/agent.js` | `buildAgent`, plus the parsers re-exported from `parse.js` | `main.js` |
 | `src/views/*.js` | default `render(ctx)` | `main.js` |
 
 ### Assistant intents
 
-Twelve intents, each with a regex and keyword match list, a trace line and an `answer(q, state)`
-that reads the live store. The engine scores every intent (2 points per regex hit, 1 per
-keyword) and runs the best one; below that, four rotating fallbacks say what the agent *can*
-answer.
+Nineteen intents, each with a regex and keyword match list, a trace line and an
+`answer(q, state)` that reads the live store. The engine scores every intent (2 points per
+regex hit, 1 per keyword) and runs the best one; below that, four rotating fallbacks say what
+the agent *can* answer. The twelve reading intents are declared first, so a tie resolves to
+the answer that changes nothing.
 
 | Intent | Example question |
 |---|---|
@@ -185,6 +219,43 @@ answer.
 | `cancellations` | "cancellations this week" |
 | `customer-lookup` | "history for Meera" |
 | `desk-setup` | "opening hours", "how long is a slot" |
+
+### Action intents
+
+Seven more, in `src/actions.js`. Each one parses the sentence, names the exact record it read,
+and returns a proposal carrying `actions: [{ label, doingLabel, run() }]`. `run()` is the only
+thing that touches the store, and only a press calls it. It returns
+`{ text, table, meta, suggestions, actions }`, which the panel appends as the agent's next
+reply — so a refusal can itself offer a button ("book the nearest free slot instead").
+
+| Intent | Example | What `run()` does |
+|---|---|---|
+| `act-book` | `book Anwar for physiotherapy tomorrow at 4` | Creates the booking (and the customer, if the name is new), then opens the token slip. |
+| `act-move` | `move SL-1042 to Thursday at 11` | Rewrites `date`, `time` and `staffId` in place, keeps `ref`, re-runs `assignTokens`. |
+| `act-cancel` | `cancel SL-1043 because the customer is unwell` | Sets `cancelled`, writes the reason onto the note and the history. |
+| `act-queue` | `call the next token` · `mark the current one served` · `A012 did not turn up` | One status change on one token. |
+| `act-block` | `block Nithya's afternoon tomorrow` | Pushes `blocks[]` rows. With bookings inside the window it refuses, and offers either the free part only or cancelling them first. |
+| `act-service` | `make the dental cleaning 30 minutes` · `set the physiotherapy price to 1200` | Writes the service, then retimes the future bookings whose new block still fits. |
+| `act-help` | `what can you do?` | Reads nothing, writes nothing — prints `ACTION_EXAMPLES`. |
+
+`ACTION_EXAMPLES` is exported and used twice: by `act-help` and by the **What the assistant can
+change** block in the About modal, so the documented examples and the working ones cannot
+drift apart.
+
+Three rules every action holds to:
+
+1. **Name the record before changing it.** Every proposal carries an "I read this as" table:
+   customer, service, staff, day, time — or booking, from, to.
+2. **Refuse rather than guess.** No name, an ambiguous customer with several open bookings, a
+   staff member without the skill, a slot already taken, a day that has gone — each gets a
+   plain sentence and, where there is one, a concrete alternative as a button.
+3. **Report before and after.** Every result table has a `Before` and an `After` column, and
+   the change is on screen behind the panel the moment it lands, because `store.update` fires
+   `draw()`.
+
+> `run()` is awaited by `lib/assistant.js`, so its result object must never carry a `then`
+> property — a plain object with a `then` function is a thenable and the `await` would hang
+> forever. Anything that should happen after the reply is queued with `setTimeout` instead.
 
 ---
 
@@ -260,14 +331,14 @@ In rail mode `.shell.is-rail .side__brandbtns` stacks the pair into a column und
 so both stay reachable inside 64px. Below 900px the collapse control is hidden in
 `assets/slotly.css`, because the sidebar is already a drawer there.
 
-Everything else lives in the footer: **About this demo** across the top, then two `.side__pair`
-rows that share their width and truncate rather than overflow.
+Everything else lives in the footer: two `.side__pair` rows that share their width and truncate
+rather than overflow. **About this demo** is not one of them — it is a topbar button now, next
+to the demo marker it explains, and having it in both places was one entry point too many.
 
 | Control | Effect |
 |---|---|
-| **About this demo** | The five-block modal: what this is, where it helps, how it would work for real, how the demo works, and where to read the source. Same content as the `DEMO` pill in the topbar. |
 | **nasvih.in** | Link to the author's site. The one inverted control in the footer. |
-| **Source on GitHub** | Link to the repository, drawn as an outline control so the inverted one stays unique. The glyph is code brackets in stroke SVG — the GitHub mark is a filled logo and every icon here is a stroke on `currentColor`. |
+| **GitHub** | Link to the repository, drawn as an outline control so the inverted one stays unique. The glyph is code brackets in stroke SVG — the GitHub mark is a filled logo and every icon here is a stroke on `currentColor`. |
 | **Install app** | Added by `initPWA` at the head of the last row and hidden until the browser fires `beforeinstallprompt` (or immediately on iOS, where no such event exists). While hidden it leaves the row entirely, so **Reset demo data** spans it alone. |
 | **Reset demo data** | Confirms, then re-seeds `slotly.v1`. Leaves `slotly.ui` alone. |
 
@@ -307,6 +378,65 @@ check that also re-runs on resize) and the collapse control is hidden by CSS. Th
 covers the menu button, so it closes on an outside click and on `Escape` as well as on
 navigation.
 
+## Topbar controls
+
+Left to right: the menu button (under 900px), the section title, then **About this demo**, the
+three chrome controls in `.topbar__tools`, and **New booking**. The three are icon-only, inline
+stroke SVG on `currentColor`, each with `aria-label` and `title`, each reachable by keyboard.
+
+| Control | Module | Notes |
+|---|---|---|
+| **Notifications** | `src/notify.js` | `buildNotifications(state)` derives the list from live bookings every time the panel opens — nothing is stored as a message, so it cannot go stale. Five sources: starting within the hour, staff still at the chair past their block, today's no-shows, cancellations in the week ahead, and anyone booked past their shift minutes. Each id encodes the record *and* the state it was in (`over:bk-1042:3`), so a booking that changes becomes a new, unread item. Only the read ids persist, under `slotly.notify`, capped at 300. Unread is a coloured dot **and** the word "New". |
+| **Device preview** | `src/chrome.js` | Two buttons with `aria-pressed`. Phone mode appends a fixed `.devstage` over everything at `z-index:90` and puts the app in an `<iframe>` at exactly 390 × 844 inside a 12px ink bezel, scaled to fit with `transform: scale()` on resize. It is an iframe rather than a CSS-shrunk clone so the app's own media queries fire for the honest reason. The framed URL carries `?frame=1`; `IS_FRAMED` reads it and `main.js` leaves the control out of the framed copy. `Escape` and **Back to desktop** both exit. |
+| **Dark mode** | `src/chrome.js` | Sets `data-theme="dark"` on `<html>` and writes `slotly.theme`. `readTheme()` falls back to `prefers-color-scheme`, and a `change` listener keeps following the system *until* something is stored — pressing the switch is what opts out. It also updates `<meta name="theme-color">`. |
+
+Both popovers stop the click that opened or repainted them from reaching the document
+listener that closes them on an outside click; a repaint detaches the clicked node, which
+would otherwise read as "clicked outside". The token slip and the device stage capture
+`Escape` and call `stopPropagation`, so one press closes the thing on top and not the
+assistant panel behind it.
+
+## The token slip
+
+`src/token.js`. `openToken(ctx, booking, {title})` builds its own scrim at `z-index:78` —
+above the drawer (70) and the assistant panel (75), below the toasts (80) so a "saved" message
+is still visible over it. `role="dialog"`, `aria-modal`, `aria-labelledby` on the token
+number, focus moved to **Download** on open and returned to the opener on close, `Tab` cycled
+inside the dialog, `Escape` and the close button and a scrim click all exit.
+
+The slip is `--amber-fill` with `--on-amber` text, and every quiet colour on it is an alpha of
+ink rather than a theme token — which is why it looks the same in dark mode. Ink on `#EAC81C`
+is 10.8:1.
+
+`drawSlip(data)` paints the same content on an offscreen 1080 × 1350 canvas: solid yellow
+ground, inset ink rule, the desk name, the token at 232px mono, the reference, then the five
+detail rows, then the footer line. `document.fonts.ready` is awaited first so the canvas gets
+Inter and JetBrains Mono rather than a fallback, long values are trimmed with an ellipsis to
+the width available, and `canvas.toBlob(…, 'image/png')` feeds an object URL to a temporary
+`<a download>`. No library and no network.
+
+`tokenButton(ctx, booking)` is the "show it again" control. It is on every non-cancelled row
+in **Today** and **Bookings**, and in the booking drawer, so the slip is never a one-time
+thing. `openBooking` opens it after `onDone` has run, so a reschedule prints the reference it
+kept rather than the temporary one it was created with.
+
+## Dark mode
+
+`assets/app.css` ships the palette under `[data-theme="dark"]`: surfaces go dark, hairlines
+lift, the status colours brighten, and `--amber-fill` and `--on-amber` do not move at all. The
+rule that survives the theme is the same one that governs the light build — **the yellow is a
+fill and the text on it is ink**.
+
+`assets/slotly.css` adds only the corrections this app's own markup needs. The yellow sidebar
+paints its text with `--ink`, which is near-white in dark mode, so every rule that puts type on
+`data-tone="amber"` is re-pinned to `--on-amber` (and quiet text to `#3B3D40`, 8.5:1 against
+the fill). The active nav row stays a solid white card. The switch knob, the calendar event
+bars and the uptime-style strips get the same treatment.
+
+Checked screen by screen at 1280px and 390px in both themes: Today, Calendar, Bookings,
+Services, Staff, Customers, Settings, the token slip, the notification panel, the About modal,
+the assistant panel and both sidebar tones.
+
 ## Installable (PWA)
 
 Three files, no build step and no dependency.
@@ -336,7 +466,7 @@ dismissed" note look like every other message in the app.
 
 **The `SHELL` array in `sw.js` is the one thing to maintain.** It lists this app's own files
 explicitly — `./`, `./index.html`, the manifest, both stylesheets, all three `lib` modules,
-all eleven `src` modules and the three icons. `addAll` is atomic: one file that 404s fails the
+all seventeen `src` modules and the three icons. `addAll` is atomic: one file that 404s fails the
 whole install and the app is then not available offline, and one file left off the list is
 simply missing when there is no connection. Add or rename a file, update `SHELL` and bump
 `CACHE_VERSION` in the same commit.

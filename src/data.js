@@ -236,8 +236,20 @@ export function seedState() {
     staff,
     customers,
     bookings,
+    blocks: [],
     seededAt: Date.now(),
   };
+}
+
+/**
+ * Older saved states in this browser predate staff time-off blocks. The store
+ * hands back whatever was in localStorage, so every field added after the first
+ * release has to be defaulted here rather than assumed.
+ */
+export function ensureShape(state) {
+  if (!state || typeof state !== 'object') return state;
+  if (!Array.isArray(state.blocks)) state.blocks = [];
+  return state;
 }
 
 /** Token numbers run per day, in slot order. */
@@ -284,15 +296,27 @@ export function staffWorks(state, staffId, key) {
   return (st.days || []).includes(parseDay(key).getDay());
 }
 
-/** Minutes a staff member is on shift for a day (break removed). */
+/* ---------- staff time off (blocks) ---------- */
+/** Blocked periods held against one staff member on one day. */
+export const blocksOn = (state, staffId, key) =>
+  (state.blocks || []).filter((x) => x.staffId === staffId && x.date === key)
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+/** Minutes blocked out of a staff member's shift on a day. */
+export function blockedMinutes(state, staffId, key) {
+  return blocksOn(state, staffId, key).reduce((n, x) => n + Math.max(0, toMin(x.end) - toMin(x.start)), 0);
+}
+
+/** Minutes a staff member is on shift for a day (break and time off removed). */
 export function shiftMinutes(state, staffId, key) {
   if (!staffWorks(state, staffId, key)) return 0;
   const st = staffOf(state, staffId);
   const brk = Math.max(0, toMin(st.breakEnd) - toMin(st.breakStart));
-  return Math.max(0, toMin(st.end) - toMin(st.start) - brk);
+  return Math.max(0, toMin(st.end) - toMin(st.start) - brk - blockedMinutes(state, staffId, key));
 }
 
-/** True when [start,start+block) fits the shift, misses the break and hits no booking. */
+/** True when [start,start+block) fits the shift, misses the break, clears any
+    blocked period and hits no booking. */
 export function staffFree(state, staffId, key, start, block, ignoreId) {
   if (!staffWorks(state, staffId, key)) return false;
   const st = staffOf(state, staffId);
@@ -302,6 +326,7 @@ export function staffFree(state, staffId, key, start, block, ignoreId) {
   const bs = toMin(st.breakStart);
   const be = toMin(st.breakEnd);
   if (s < be && e > bs) return false;
+  if (blocksOn(state, staffId, key).some((x) => s < toMin(x.end) && e > toMin(x.start))) return false;
   return !state.bookings.some((b) => {
     if (b.staffId !== staffId || b.date !== key) return false;
     if (b.id === ignoreId) return false;
@@ -426,6 +451,19 @@ export function createBooking(state, { date, time, serviceId, staffId, customerI
   state.bookings.push(b);
   assignTokens(state.bookings);
   return b;
+}
+
+/** Hold a period of a staff member's day back from booking. */
+export function addBlock(state, { staffId, date, start, end, reason }) {
+  const rec = {
+    id: `blk-${Math.random().toString(36).slice(2, 8)}`,
+    staffId, date, start, end,
+    reason: reason || 'Held at the front desk',
+    at: Date.now(),
+  };
+  state.blocks = state.blocks || [];
+  state.blocks.push(rec);
+  return rec;
 }
 
 /** Message template rendering — {{name}}, {{service}}, {{date}} … */

@@ -3,6 +3,7 @@
 import { h, icon, toast, meter, pct } from '../../lib/ui.js';
 import {
   todayKey, addDays, weekStart, parseDay, DOW, hm12, toMin, shiftMinutes, staffWorks, utilisation,
+  dayLabel, relativeDay,
 } from '../data.js';
 
 function card(ctx, st) {
@@ -106,6 +107,28 @@ function card(ctx, st) {
       h('div', {},
         h('div', { class: 'label', style: 'margin-bottom:8px' }, 'Services this person can take'),
         skills),
+
+      /* Time held back — written by the desk agent, released from here. */
+      (() => {
+        const held = (s.blocks || []).filter((x) => x.staffId === st.id && x.date >= todayKey())
+          .sort((a, b) => (a.date === b.date ? a.start.localeCompare(b.start) : a.date.localeCompare(b.date)));
+        return h('div', {},
+          h('div', { class: 'label', style: 'margin-bottom:8px' }, 'Time held back'),
+          held.length
+            ? h('div', { class: 'heldlist' }, held.map((x) => {
+              const drop = h('button', { class: 'btn btn--sm', type: 'button', 'aria-label': `Release ${hm12(x.start)} to ${hm12(x.end)} on ${dayLabel(x.date)} for ${st.name}` }, 'Release');
+              drop.addEventListener('click', () => {
+                ctx.store.update((d) => { d.blocks = (d.blocks || []).filter((y) => y.id !== x.id); });
+                toast('Time released back onto the grid', 'ok');
+              });
+              return h('div', { class: 'heldrow' },
+                h('div', { style: 'min-width:0' },
+                  h('div', { class: 'mono small' }, `${relativeDay(x.date)} · ${hm12(x.start)}–${hm12(x.end)}`),
+                  h('div', { class: 'small faint truncate' }, x.reason)),
+                drop);
+            }))
+            : h('p', { class: 'hint', style: 'margin:0' }, 'Nothing held back. Ask the assistant to block a morning or an afternoon and it shows up here.'));
+      })(),
 
       h('div', { class: 'between' },
         h('label', { class: 'switch' }, activeCb, h('span', { class: 'switch__track' }), h('span', {}, 'Taking bookings')),

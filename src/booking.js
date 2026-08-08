@@ -9,6 +9,7 @@ import {
   todayKey, dayLabel, hm12, toMin, deskNowMin, freeSlots, freeStaffAt, staffOf, svcOf, custOf,
   createBooking, assignTokens, logEvent, tokenLabel, relativeDay, isOpenDay,
 } from './data.js';
+import { openToken } from './token.js';
 
 const ANY = '__any';
 
@@ -184,7 +185,11 @@ export function openBooking(ctx, prefill = {}) {
           });
           const label = made ? tokenLabel(ctx.state, ctx.state.bookings.find((b) => b.id === made.id)) : '';
           toast(`Booked ${label} — ${custOf(ctx.state, customerId).name}, ${relativeDay(draft.date)} ${hm12(draft.time)}`, 'ok');
+          /* onDone runs first: a reschedule puts the original reference back on
+             the new record, and the slip has to print that, not the temporary. */
           if (prefill.onDone) prefill.onDone(made);
+          const fresh = made && ctx.state.bookings.find((b) => b.id === made.id);
+          if (fresh) openToken(ctx, fresh, { title: prefill.tokenTitle || 'Booked' });
           return false;
         },
       },
@@ -199,6 +204,7 @@ export function openReschedule(ctx, booking) {
   openBooking(ctx, {
     title: `Reschedule ${booking.ref}`,
     okLabel: 'Move booking',
+    tokenTitle: 'Moved',
     date: booking.date,
     serviceId: booking.serviceId,
     staffId: booking.staffId,

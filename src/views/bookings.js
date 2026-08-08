@@ -6,6 +6,7 @@ import {
   renderTemplate, templateVars, relativeDay,
 } from '../data.js';
 import { openBooking, openReschedule, cancelBooking } from '../booking.js';
+import { openToken, tokenButton } from '../token.js';
 import { drawer } from '../drawer.js';
 
 const RANGES = [
@@ -64,6 +65,7 @@ function detail(ctx, b) {
     subtitle: `${relativeDay(b.date)} at ${hm12(b.time)}`,
     body,
     actions: [
+      { label: 'Show token', onClick: () => { openToken(ctx, b, { title: `${relativeDay(b.date)} booking` }); } },
       { label: 'Reschedule', onClick: () => { openReschedule(ctx, b); } },
       { label: 'Cancel booking', class: 'btn--danger', onClick: () => { cancelBooking(ctx, b); } },
     ],
@@ -188,6 +190,7 @@ export default function renderBookings(ctx) {
           h('td', {}, staffOf(s, b.staffId).name),
           h('td', {}, h('span', { class: `pill ${st.pill}` }, st.label)),
           h('td', { class: 'right' }, h('div', { class: 'btnrow', style: 'justify-content:flex-end' },
+            b.status === 'cancelled' ? null : tokenButton(ctx, b),
             closed ? null : move, closed ? null : cancel)));
       })));
 

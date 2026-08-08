@@ -6,6 +6,7 @@ import {
   STATUS, utilisation, customerStats, isOpenDay, toMin,
 } from '../data.js';
 import { openBooking, openReschedule, cancelBooking, setStatus } from '../booking.js';
+import { tokenButton } from '../token.js';
 
 const FILTERS = [
   { id: 'all', label: 'Everyone' },
@@ -64,6 +65,8 @@ function actions(ctx, b) {
       toast(`${tokenLabel(ctx.state, b)} back in the queue`, '');
     }, `Put ${name} back in the queue`));
   }
+  /* The slip is never a one-time thing — any row can print it again. */
+  if (b.status !== 'cancelled') row.appendChild(tokenButton(ctx, b));
   return row;
 }
 

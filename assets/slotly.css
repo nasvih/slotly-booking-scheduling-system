@@ -70,6 +70,9 @@ button.pill:hover{border-color:var(--amber)}
 .cal__ev--st-anwar{border-left-color:var(--ok)}
 .cal__ev--st-nithya{border-left-color:var(--amber-deep)}
 .cal__ev--off{opacity:.55;border-left-color:var(--line-2)}
+/* time held back for a staff member: not a booking, but the slot is gone */
+.cal__ev--held{border-style:dashed;border-left:3px solid var(--warn);background:var(--warn-soft);color:var(--warn)}
+.cal__ev--held b{color:var(--warn)}
 
 /* == 4. slot picker == */
 .slotgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:7px;max-height:190px;overflow-y:auto;padding:2px}
@@ -170,6 +173,132 @@ button.pill:hover{border-color:var(--amber)}
 /* the active row is white on yellow; a hover tint over it only muddies the state */
 .side[data-tone="amber"] .navlink.is-active:hover{background:var(--bg)}
 
+/* == 7c. topbar: demo/about button and the chrome controls ==
+   Title, then everything else. The title is the only thing allowed to shrink,
+   so the controls never push past the right edge at 390px. */
+.topbar__id{min-width:0;flex:0 1 auto;overflow:hidden}
+.topbar__title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar__tools{display:flex;align-items:center;gap:2px;flex:none}
+/* the title is the only thing in the bar allowed to give up width */
+.topbar>.btn,.topbar__tools .btn{flex:none}
+.aboutpill{flex:none;text-transform:none;letter-spacing:.01em;font-size:11px;padding:5px 10px;white-space:nowrap}
+.devseg{display:inline-flex;align-items:center;gap:2px}
+.devseg .btn.is-on{background:var(--amber-soft);border-color:var(--amber-line);color:var(--amber-deep)}
+
+/* == 7d. notifications ==
+   Derived from the live bookings every time the panel opens; only the read
+   marks are stored. Unread is a dot AND the word, never colour alone. */
+.bellwrap{position:relative;display:inline-flex}
+.bellbtn{position:relative}
+.bellbtn__count{position:absolute;top:0;right:0;min-width:16px;height:16px;padding:0 4px;border-radius:var(--r-pill);background:var(--bad);color:#fff;font-size:9.5px;font-weight:700;line-height:16px;text-align:center}
+.notepanel{position:absolute;top:calc(100% + 8px);right:0;width:360px;max-height:min(70vh,520px);overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-3);z-index:40}
+.notepanel__head{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--surface)}
+.notelist{display:flex;flex-direction:column}
+.noterow{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:11px 14px;cursor:pointer;color:inherit;font:inherit}
+.noterow:hover{background:var(--hover)}
+.noterow.is-new{background:var(--amber-soft)}
+.noterow__dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none;background:var(--faint)}
+.noterow__dot--bad{background:var(--bad)}
+.noterow__dot--warn{background:var(--warn)}
+.noterow__dot--info{background:var(--info)}
+.noterow__dot--muted{background:var(--line-2)}
+.noterow__body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.noterow__title{font-weight:600;font-size:13px}
+.noterow__new{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber-deep)}
+.noterow__text{font-size:12px;color:var(--muted);line-height:1.45}
+.noterow__when{font-size:10.5px;color:var(--faint);flex:none;padding-top:2px}
+.notepanel__empty{padding:28px 20px;text-align:center}
+.notepanel__foot{padding:10px 14px;border-top:1px solid var(--line);line-height:1.5}
+
+/* == 7e. the token slip ==
+   Plain yellow ground, black type, nothing else on it. Ink on #EAC81C is
+   10.8:1, so every colour here is fixed against the fill rather than against
+   the page — which is why it reads the same in dark mode. */
+.tokscrim{position:fixed;inset:0;z-index:78;background:rgba(23,24,26,.55);display:grid;place-items:center;padding:18px;overflow-y:auto}
+.tokenpop{width:min(420px,100%);background:var(--amber-fill);color:var(--on-amber);border:1px solid var(--on-amber);border-radius:var(--r-lg);box-shadow:var(--shadow-3);padding:16px 20px 18px;text-align:center}
+.tokenpop__head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tokenpop__eyebrow{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.tokenpop__x{width:30px;height:30px;flex:none;border-radius:var(--r-sm);border:1px solid rgba(23,24,26,.3);background:rgba(255,255,255,.6);color:var(--on-amber);display:grid;place-items:center;cursor:pointer;padding:0}
+.tokenpop__x svg{width:16px;height:16px}
+.tokenpop__x:hover{background:#fff}
+.tokenpop__label{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-top:14px;color:rgba(23,24,26,.78)}
+.tokenpop__num{font-family:var(--mono);font-size:clamp(58px,17vw,86px);font-weight:700;line-height:1.02;letter-spacing:-.03em;margin-top:4px}
+.tokenpop__ref{font-family:var(--mono);font-size:14px;font-weight:600;letter-spacing:.1em;margin-top:4px}
+.tokenpop__kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;text-align:left;margin-top:16px;padding-top:14px;border-top:1px solid rgba(23,24,26,.3)}
+.tokenpop__kv dt{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(23,24,26,.74);padding-top:2px}
+.tokenpop__kv dd{font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
+.tokenpop__note{text-align:left;font-size:12px;line-height:1.5;margin-top:14px;color:rgba(23,24,26,.82)}
+.tokenpop__foot{display:flex;gap:8px;margin-top:16px}
+.tokenpop__foot .btn{flex:1}
+.tokenpop__dl{background:var(--on-amber);border-color:var(--on-amber);color:var(--amber-fill)}
+.tokenpop__dl:hover{background:#000;border-color:#000;color:var(--amber-fill)}
+.tokenpop__dl svg{color:var(--amber-fill)}
+.tokenpop__done{background:rgba(255,255,255,.7);border-color:rgba(23,24,26,.3);color:var(--on-amber)}
+.tokenpop__done:hover{background:#fff;border-color:rgba(23,24,26,.45)}
+.tokenpop :focus-visible{outline-color:var(--on-amber)}
+
+/* == 7f. device preview ==
+   A real iframe at 390×844 inside a bezel, so the app's own breakpoints fire
+   for the honest reason. Yellow surround, ink text — the usual pairing. */
+.devstage{position:fixed;inset:0;z-index:90;background:var(--amber-fill);color:var(--on-amber);display:flex;flex-direction:column;align-items:center;padding:16px 16px 0;overflow:hidden}
+.devstage__head{width:100%;max-width:560px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.devstage__name{font-size:18px;font-weight:700;letter-spacing:-.02em}
+.devstage__sub{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:rgba(23,24,26,.75);margin-top:2px}
+.devstage__body{flex:1;width:100%;display:flex;justify-content:center;align-items:flex-start;min-height:0}
+.devbezel{width:414px;height:868px;flex:none;padding:12px;border-radius:46px;background:#17181A;box-shadow:var(--shadow-3);transform-origin:top center}
+.devframe{width:390px;height:844px;border:0;border-radius:34px;background:var(--bg);display:block}
+.devstage .btn{background:rgba(255,255,255,.8);border-color:rgba(23,24,26,.3);color:var(--on-amber)}
+.devstage .btn:hover{background:#fff;border-color:rgba(23,24,26,.5)}
+.devstage :focus-visible{outline-color:var(--on-amber)}
+
+/* == 7g. worked examples in the About modal == */
+.exlist{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+.exrow{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface-2)}
+.exrow__t{font-weight:600;font-size:13px}
+.exrow__in{display:block;font-family:var(--mono);font-size:11.5px;margin-top:5px;padding:5px 8px;border:1px solid var(--line-2);border-radius:var(--r-xs);background:var(--surface);overflow-wrap:anywhere}
+.exrow__out{margin-top:6px;line-height:1.5}
+
+/* == 7h. held time (staff card) == */
+.heldlist{display:flex;flex-direction:column;gap:8px}
+.heldrow{display:flex;align-items:center;gap:10px;justify-content:space-between;border:1px solid var(--line-2);border-radius:var(--r-sm);padding:8px 10px}
+
+/* == 7i. dark mode corrections ==
+   app.css ships the palette; these are the places where this app's own markup
+   would otherwise inherit the wrong side of it. The rule that matters: yellow
+   is a fill and the text on it stays ink, in either theme. */
+[data-theme="dark"] .side[data-tone="amber"]{border-right-color:rgba(23,24,26,.35)}
+[data-theme="dark"] .side[data-tone="amber"] .side__name,
+[data-theme="dark"] .side[data-tone="amber"] .navlink,
+[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active{color:var(--on-amber)}
+[data-theme="dark"] .side[data-tone="amber"] .side__tag,
+[data-theme="dark"] .side[data-tone="amber"] .navgroup__label,
+[data-theme="dark"] .side[data-tone="amber"] .navlink__count,
+[data-theme="dark"] .side[data-tone="amber"] .side__sub{color:#3B3D40}
+[data-theme="dark"] .side[data-tone="amber"] .side__sub .linkish{border-bottom-color:#3B3D40}
+[data-theme="dark"] .side[data-tone="amber"] .navlink svg{color:#6B5400}
+[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active{background:#FFFFFF}
+[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active svg{color:#6B5400}
+[data-theme="dark"] .side[data-tone="amber"] .navlink:hover{background:rgba(23,24,26,.1)}
+[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active:hover{background:#FFFFFF}
+[data-theme="dark"] .side[data-tone="amber"] .mark{background:var(--on-amber);color:var(--amber-fill)}
+[data-theme="dark"] .side[data-tone="amber"] .btn,
+[data-theme="dark"] .side[data-tone="amber"] .side__pair .navlink:not(.sitelink){background:rgba(255,255,255,.78);border-color:rgba(23,24,26,.3);color:var(--on-amber)}
+[data-theme="dark"] .side[data-tone="amber"] .btn:hover,
+[data-theme="dark"] .side[data-tone="amber"] .side__pair .navlink:not(.sitelink):hover{background:#fff}
+[data-theme="dark"] .side[data-tone="amber"] .side__pair .navlink:not(.sitelink) svg{color:#3B3D40}
+[data-theme="dark"] .side[data-tone="amber"] :focus-visible{outline-color:var(--on-amber)}
+/* the inverted link needs a ground that still reads as deliberate on yellow */
+[data-theme="dark"] .sitelink{background:#101113}
+[data-theme="dark"] .side[data-tone="amber"] .sitelink,
+[data-theme="dark"] .side[data-tone="amber"] .sitelink svg{color:#FFFFFF}
+/* switch knob and the yellow controls keep ink on them */
+[data-theme="dark"] .switch__track::after{background:var(--surface)}
+[data-theme="dark"] .switch input:checked+.switch__track::after{background:var(--on-amber)}
+[data-theme="dark"] .slotbtn.is-on small{color:var(--on-amber)}
+/* the calendar's colour bars are per staff and must stay apart on a dark grid */
+[data-theme="dark"] .cal__ev{background:var(--surface)}
+[data-theme="dark"] .stripe i{background:var(--line-2)}
+
 /* == 8. responsive == */
 @media (max-width:1080px){
   .tplgrid{grid-template-columns:minmax(0,1fr)}
@@ -185,7 +314,19 @@ button.pill:hover{border-color:var(--amber)}
   .qacts{justify-content:flex-start;width:100%}
   .qtok{border-right:0;padding-right:0;width:auto;text-align:left}
   .datenav__label{min-width:130px;font-size:11.5px}
-  .toolbar .search{max-width:none}
+  /* app.css already widens .search to a full row at this width */
   .kv{grid-template-columns:minmax(0,1fr)}
   .kv dd{margin-bottom:6px}
+  /* The topbar carries five controls at phone width and none of them may be
+     squeezed, so the section title stands down — every screen already prints
+     its own heading directly underneath. The primary button drops to its icon
+     and the notification panel becomes a sheet. */
+  .topbar{gap:8px;padding:0 12px}
+  .topbar__id{display:none}
+  .topbar__tools{gap:0}
+  .topbar .btn--primary span{display:none}
+  .topbar .btn--primary{padding:8px 10px}
+  .aboutpill{font-size:10px;padding:5px 8px;letter-spacing:0}
+  .notepanel{position:fixed;top:calc(var(--bar) + 6px);left:12px;right:12px;width:auto;max-height:calc(100vh - var(--bar) - 24px)}
+  .devstage{padding:12px 12px 0}
 }

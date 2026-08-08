@@ -17,6 +17,25 @@ modifying, redistributing or using it in your own work needs written permission 
 
 ---
 
+## Tech stack
+
+- **Plain HTML, CSS and ES modules.** No dependencies, no build step, no bundler, no
+  framework, no backend, no `fetch` to any host.
+- **State in `localStorage`** — one JSON document under `slotly.v1`, seeded from a fixed
+  pseudo-random sequence; interface preferences under `slotly.ui`, `slotly.theme` and
+  `slotly.notify`.
+- **Icons are inline stroke SVG** on `currentColor`. No icon font, no image sprites.
+- **Inter and JetBrains Mono from Google Fonts** — the only external request the page makes.
+- **A service worker and a web manifest** (`sw.js`, `manifest.webmanifest`) make it work
+  offline and installable.
+- **`<canvas>`** draws the downloadable token image, 1080 × 1350, saved as a PNG straight from
+  the browser. No library, no server round trip.
+- **A simulated assistant engine** (`lib/assistant.js` + `src/agent.js`, `src/actions.js`,
+  `src/parse.js`): local intent matching over this app's own data, with answers and applied
+  changes computed in the browser. There is no model and no network call behind it.
+
+It deploys as static files anywhere — GitHub Pages, S3, Netlify, nginx, a USB stick.
+
 ## What this is
 
 Slotly runs a front desk. Booked appointments and walk-in tokens sit in the same queue on the
@@ -54,8 +73,12 @@ sync between browsers or devices.
 app's own demo data. It is a demonstration of the interaction, not a connected model, and no
 request leaves your browser.
 
-The same four blocks are in the app, under **About this demo** in the sidebar footer and
-behind the `DEMO` pill in the topbar.
+**The assistant also does the work.** Ask it in plain words to book someone in, move a
+booking, cancel one with a reason, call the next token, hold back a staff member's afternoon
+or change a service. It shows you exactly which record it read, and writes nothing until you
+press the button on its reply. Ask **what can you do?** for the list with an example each.
+
+The same blocks are in the app, behind the **About this demo** button in the topbar.
 
 ---
 
@@ -71,18 +94,38 @@ behind the `DEMO` pill in the topbar.
 | **Customers** | Visit history and no-show rate per customer, sortable, with a reminder-call filter for anyone at 25% or above. Detail drawer with a 16-booking outcome strip, a desk note and full history. CSV export. |
 | **Settings** | Desk name, opening and closing time, slot length, closed days, token prefix. Three message templates with `{{name}}`-style placeholders, insertable placeholder chips and a live preview rendered against a real booking. Demo data counts and the reset action. |
 
+### The token slip
+
+Every booking — from the calendar, from the booking dialog or from the assistant — ends with a
+plain yellow slip on black type: the token in large mono, the `SL-…` reference under it, then
+customer, service, staff, date and time. **Download** draws the same slip on a `<canvas>` at
+1080 × 1350 and saves it as a PNG the visitor can keep; a line on the popup says a screenshot
+works too. It is never a one-time thing — every booking row on **Today** and in **Bookings**
+has a **Token** button that shows it again, and so does the row detail drawer.
+
+### Topbar controls
+
+| Control | What it does |
+|---|---|
+| **About this demo** | The modal: what this is, where it helps, what the assistant can change (with a worked example each), how the demo works, and where to read the source. |
+| **Notifications** | A bell with an unread count. The list is worked out from the live bookings every time it opens: anything starting within the hour, today's no-shows, cancellations in the week ahead, and anyone running over or booked past their hours. Mark one or all read; the read marks persist under `slotly.notify`. Empty state when the desk is clear. |
+| **Device preview** | Phone and desktop icons. Phone mode drops the whole app into a 390 × 844 `<iframe>` inside a rounded bezel on a yellow surround, so the real breakpoints fire for the real reason. The framed copy carries `?frame=1` and hides the control, so there is no preview inside the preview. |
+| **Dark mode** | Sets `data-theme="dark"` on `<html>` and persists it under `slotly.theme`. On a first visit it follows `prefers-color-scheme`, and keeps following the system until you press the switch. The yellow stays a fill with ink text in both themes. |
+
 The sidebar is the brand yellow by default, with ink text on it. Two icon-only controls sit on
 the brand row at the top, right of the name: a circle half filled switches between yellow and
 plain white (labelled *Sidebar colour* — it names no colour, and `aria-pressed` carries the
 tone), and a panel with a chevron collapses the sidebar to a 64px icon rail. Both choices
 persist under their own `slotly.ui` key, separate from the demo data. The footer below holds
-**About this demo** across the top, then nasvih.in beside **Source on GitHub**, then **Reset
-demo data** — joined by an **Install app** button where the browser offers one. The assistant
-has a single entry point: the round launcher at the bottom right, or `⌘K` / `Ctrl+K`.
+nasvih.in beside **GitHub**, then **Reset demo data** — joined by an **Install app** button
+where the browser offers one. The assistant has a single entry point: the round launcher at
+the bottom right, or `⌘K` / `Ctrl+K`.
 
-Three flows that persist through `localStorage`: **booking** (calendar or dialog → blocks the
-slot → appears in Today), **queue state changes** (call / serve / done / no-show / undo),
-**setup edits** (service prices and toggles, staff rotas, message templates, desk notes).
+Flows that persist through `localStorage`: **booking** (calendar, dialog or assistant → blocks
+the slot → appears in Today), **queue state changes** (call / serve / done / no-show / undo),
+**setup edits** (service prices and toggles, staff rotas, message templates, desk notes),
+**held staff time** (written by the assistant, released from the staff card) and the interface
+preferences above.
 
 ---
 
@@ -141,9 +184,14 @@ the repository.
 | `lib/ui.js` | DOM helpers, formatting, seeded random, `createStore`, hash router, toast, modal, confirm, CSV, bar chart, meter, icons. |
 | `lib/assistant.js` | The assistant engine: intent routing, word-by-word streaming, panel and launcher. |
 | `lib/pwa.js` | Service worker registration and the install control. |
-| `src/main.js` | Boot: store, shell, nav, router, keyboard shortcuts, about modal, assistant mount, install control. |
-| `src/data.js` | Seeded dataset and every scheduling calculation — availability, utilisation, no-show rates, templates. |
-| `src/agent.js` | The twelve *Slotly Desk* intents, each reading live store state. |
+| `src/main.js` | Boot: store, shell, nav, router, keyboard shortcuts, about modal, topbar controls, assistant mount, install control. |
+| `src/data.js` | Seeded dataset and every scheduling calculation — availability, utilisation, no-show rates, held time, templates. |
+| `src/agent.js` | The twelve reading *Slotly Desk* intents, each computed from live store state. |
+| `src/actions.js` | The seven acting intents: book, reschedule, cancel, run the queue, hold staff time, change a service, and "what can you do?". |
+| `src/parse.js` | Plain-language parsing shared by both: day, time, service, staff, customer, booking reference, window of a day. |
+| `src/token.js` | The token slip popup and the canvas PNG it downloads. |
+| `src/notify.js` | Notifications derived from live bookings, and the bell and panel. |
+| `src/chrome.js` | Dark mode and the device preview. |
 | `src/booking.js` | The booking dialog, reschedule, cancel and status changes, shared by three views. |
 | `src/drawer.js` | Right-hand detail drawer. |
 | `src/views/*.js` | One module per screen, each exporting `render(ctx) -> Node`. |
