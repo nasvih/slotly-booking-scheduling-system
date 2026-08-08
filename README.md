@@ -152,4 +152,4 @@ the repository.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+All rights reserved. This repository is source-available: you may read it, run it locally and evaluate it, but copying, modifying, redistributing or using it in your own work needs written permission — see [LICENSE](LICENSE).
