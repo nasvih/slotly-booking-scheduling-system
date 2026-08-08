@@ -18,7 +18,7 @@ export function readTheme() {
   let stored = null;
   try { stored = localStorage.getItem(THEME_KEY); } catch (_) { stored = null; }
   if (stored === 'dark' || stored === 'light') return stored;
-  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return 'light';
 }
 
 export function applyTheme(mode) {
@@ -57,7 +57,7 @@ export function themeToggle() {
       let stored = null;
       try { stored = localStorage.getItem(THEME_KEY); } catch (_) { stored = null; }
       if (stored === 'dark' || stored === 'light') return;
-      mode = mq.matches ? 'dark' : 'light';
+      mode = 'light';
       paint();
     };
     if (mq.addEventListener) mq.addEventListener('change', onSystem);

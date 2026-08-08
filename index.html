@@ -22,7 +22,7 @@
    is one, otherwise whatever the operating system asks for. src/chrome.js owns
    the same key and takes over from here. */
 (function(){try{var m=localStorage.getItem('slotly.theme');
-if(m!=='dark'&&m!=='light'){m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+if(m!=='dark'&&m!=='light'){m='light';}
 if(m==='dark'){document.documentElement.setAttribute('data-theme','dark');}
 document.documentElement.style.colorScheme=m;}catch(e){}})();
 </script>
