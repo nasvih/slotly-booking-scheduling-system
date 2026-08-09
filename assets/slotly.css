@@ -87,7 +87,10 @@ button.pill:hover{border-color:var(--amber)}
    ancestor it resolves against the initial containing block, escaping the
    horizontally scrolled Services table and widening the whole document. */
 .switch{position:relative}
-.staffgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--gutter)}
+/* min() rather than a bare 320px: below a 320px track the minimum would win
+   over the 1fr and the card would stand wider than the page it sits in, which
+   is a sideways scroll on a 320px phone. */
+.staffgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:var(--gutter)}
 .staffcard__top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
 .staffcard__top .avatar{width:38px;height:38px;font-size:13px}
 .daypicker{display:flex;gap:5px;flex-wrap:wrap}
@@ -213,9 +216,13 @@ button.pill:hover{border-color:var(--amber)}
 /* == 7e. the token slip ==
    Plain yellow ground, black type, nothing else on it. Ink on #EAC81C is
    10.8:1, so every colour here is fixed against the fill rather than against
-   the page — which is why it reads the same in dark mode. */
-.tokscrim{position:fixed;inset:0;z-index:78;background:rgba(23,24,26,.55);display:grid;place-items:center;padding:18px;overflow-y:auto}
-.tokenpop{width:min(420px,100%);background:var(--amber-fill);color:var(--on-amber);border:1px solid var(--on-amber);border-radius:var(--r-lg);box-shadow:var(--shadow-3);padding:16px 20px 18px;text-align:center}
+   the page — which is why it reads the same in dark mode.
+   The scrim scrolls, so the slip is centred with auto margins rather than with
+   place-items: centring a grid item taller than its scroll container puts its
+   top above the scroll origin, and the head of the slip becomes unreachable on
+   a short viewport (a phone held sideways). Auto margins collapse instead. */
+.tokscrim{position:fixed;inset:0;z-index:78;background:rgba(23,24,26,.55);display:flex;padding:18px;overflow-y:auto}
+.tokenpop{width:min(420px,100%);margin:auto;background:var(--amber-fill);color:var(--on-amber);border:1px solid var(--on-amber);border-radius:var(--r-lg);box-shadow:var(--shadow-3);padding:16px 20px 18px;text-align:center}
 .tokenpop__head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .tokenpop__eyebrow{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
 .tokenpop__x{width:30px;height:30px;flex:none;border-radius:var(--r-sm);border:1px solid rgba(23,24,26,.3);background:rgba(255,255,255,.6);color:var(--on-amber);display:grid;place-items:center;cursor:pointer;padding:0}
@@ -307,26 +314,70 @@ button.pill:hover{border-color:var(--amber)}
   /* rail mode is a desktop concern: under 900px the sidebar is already an
      off-canvas drawer, so the collapse control is not offered at all */
   .side__brandbtns [data-act="rail"]{display:none}
+
+  /* Below 900px the sidebar is a drawer, which is the app admitting the pointer
+     is a thumb. The kit's controls are sized for a mouse — a 34px icon button,
+     a 30px small button, a 38px nav row — so everything that gets pressed is
+     lifted here. Order matters: .btn goes first, then the variants restate the
+     boxes they own, or the wider padding would burst their fixed squares. */
+  .btn{padding:9px 14px}
+  .btn--sm{padding:8px 11px}
+  .btn--icon{padding:7px;width:40px;height:40px}
+  .side__brandbtns .btn{width:36px;height:36px;padding:0}
+  .navlink{padding:10px}
+  .side__pair .navlink{padding:10px 8px}
+  .chip{min-height:36px;padding:6px 11px}
+  .seg button{min-height:40px}
+  .tab{min-height:40px}
+  .daypicker button{width:40px;height:36px}
+  .tokenpop__x{width:36px;height:36px}
+  .aboutpill{min-height:34px}
 }
 @media (max-width:640px){
   .fieldrow{grid-template-columns:minmax(0,1fr)}
   .qrow{flex-wrap:wrap}
   .qacts{justify-content:flex-start;width:100%}
   .qtok{border-right:0;padding-right:0;width:auto;text-align:left}
-  .datenav__label{min-width:130px;font-size:11.5px}
+  /* Prev · week label · next · "This week" is 324px of controls that will not
+     compress, so at phone width the row wraps instead of pushing the page
+     sideways. The label claims enough basis that "This week" is the member that
+     drops to the second line, and the date range keeps its single line. */
+  .datenav{display:flex;flex-wrap:wrap}
+  .datenav__label{flex:1 1 160px;min-width:160px;font-size:11.5px}
   /* app.css already widens .search to a full row at this width */
   .kv{grid-template-columns:minmax(0,1fr)}
   .kv dd{margin-bottom:6px}
   /* The topbar carries five controls at phone width and none of them may be
      squeezed, so the section title stands down — every screen already prints
      its own heading directly underneath. The primary button drops to its icon
-     and the notification panel becomes a sheet. */
-  .topbar{gap:8px;padding:0 12px}
+     and the notification panel becomes a sheet.
+     Even so the row did not fit: at 360px the "New booking" button sat 2px past
+     the edge and at 320px it was 42px out, so the whole page scrolled sideways
+     and the primary action could not be reached. The device preview is what
+     goes: it opens a 390×844 phone bezel, which is nothing a phone-width
+     viewport needs — the app already withholds it inside that frame for the
+     same reason. Dropping it frees 70px and the row fits at 320px with room to
+     spare, which is what pays for the 40px tap targets below. */
+  .topbar{gap:6px;padding:0 10px}
   .topbar__id{display:none}
   .topbar__tools{gap:0}
   .topbar .btn--primary span{display:none}
-  .topbar .btn--primary{padding:8px 10px}
-  .aboutpill{font-size:10px;padding:5px 8px;letter-spacing:0}
+  .devseg{display:none}
+  /* the label is gone, so the button becomes the same 40px square as its
+     neighbours rather than a narrower slab */
+  .topbar .btn--primary{width:40px;height:40px;padding:0}
+  /* last-resort give: the pill yields width before the row can overflow again */
+  .aboutpill{font-size:10px;padding:5px 8px;letter-spacing:0;flex:0 1 auto;min-width:0;overflow:hidden}
   .notepanel{position:fixed;top:calc(var(--bar) + 6px);left:12px;right:12px;width:auto;max-height:calc(100vh - var(--bar) - 24px)}
   .devstage{padding:12px 12px 0}
+
+  /* A card table has no room for wide headers, but these tables scroll inside
+     their wrapper, so wrapping a header only squeezes the column and doubles
+     the row height. Let them keep their line and scroll instead. */
+  .tablewrap--scroll table.data th{white-space:nowrap}
+  .tablewrap--scroll table.data .linkish{white-space:nowrap}
+
+  /* The assistant launcher is fixed 22px off the bottom and is 52px across, so
+     the foot of a view would otherwise sit under it. */
+  .view--pad{padding:16px 16px 88px}
 }
