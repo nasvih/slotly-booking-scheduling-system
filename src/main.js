@@ -286,10 +286,22 @@ railBtn.addEventListener('click', () => { ui.rail = !ui.rail; saveUI(); applyChr
 toneBtn.addEventListener('click', () => { ui.tone = ui.tone === 'amber' ? 'plain' : 'amber'; saveUI(); applyChrome(); });
 wide.addEventListener('change', applyChrome);
 
-/* The way back out to the customer's page. It sits at the head of the footer
-   rather than in the topbar: the topbar already carries five controls and
-   will not take a sixth at 320px, and this is a once-a-session move, not a
-   desk action. Same quietness as the "Staff desk" control on the way in. */
+/* The way back out to the customer's page, in the topbar — the mirror of the
+   "Staff desk" control that brought you in. A door you walked through in the
+   header should be a door you can walk back through in the header. It drops
+   to its glyph under 640px, the same move "New booking" and the staff control
+   already make, so the sixth control still fits at 320. */
+const publicBtn = h('a', {
+  class: 'btn btn--sm topbar__public',
+  href: `#/${PUBLIC}`,
+  title: 'Booking page — the page customers see',
+  'aria-label': 'Booking page — the page customers see',
+  html: `${icon('eye')}<span>Booking page</span>`,
+});
+
+/* The same exit repeated at the head of the sidebar footer. Not redundancy for
+   its own sake: in rail mode the topbar is where the eye goes, in the phone
+   drawer the footer is, and neither is visible at the same time as the other. */
 const publicLink = h('a', {
   class: 'navlink',
   href: `#/${PUBLIC}`,
@@ -324,6 +336,7 @@ const shellEl = h('div', { class: 'shell' },
       menuBtn,
       h('div', { class: 'topbar__id' }, titleEl, subEl),
       h('div', { class: 'spacer' }),
+      publicBtn,
       demoPill,
       toolsEl,
       newBtn),

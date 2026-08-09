@@ -424,6 +424,14 @@ body.is-public .assist{display:none}
 /* the way into the desk: an outline control, not a primary one — booking is
    the only thing this page is asking anybody to do */
 .pubbar__staff{flex:none;min-height:40px}
+/* The mirror of .pubbar__staff, on the desk's own bar. */
+.topbar__public{flex:none;min-height:40px}
+@media (max-width:640px){
+  /* Six controls do not fit a 320px bar with their labels on. This one and
+     "New booking" are the two that read from their glyph alone. */
+  .topbar__public span{display:none}
+  .topbar__public{width:40px;height:40px;padding:0;justify-content:center}
+}
 /* the kit sizes an icon button for a mouse (34px) and only lifts it under
    900px; this page is thumbed at every width, so its two controls are 40px
    from 320 to 1920 */
