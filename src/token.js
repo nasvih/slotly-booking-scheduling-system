@@ -2,7 +2,7 @@
    slotly — the token slip.
    Shown the moment a booking is made, from the calendar, the booking
    dialog or the desk agent, and again on demand from any booking row.
-   Plain yellow ground, black type, the token large enough to read
+   Plain rose ground, white type, the token large enough to read
    across a counter. The download is drawn here on a canvas and saved
    as a PNG — no library, no network, nothing leaves the browser.
    ============================================================ */
@@ -15,8 +15,10 @@ import {
 const CLOSE_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>';
 const DOWN_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9M6.5 8.5L10 12l3.5-3.5"/><path d="M3.5 15.5h13"/></svg>';
 
-const AMBER = '#EAC81C';
-const INK = '#17181A';
+/* The slip's two colours, matching --amber-fill and --on-amber in the CSS.
+   The fill is a dark ground, so what is drawn on it is white, not ink. */
+const SLIP_BG = '#B82D6E';
+const SLIP_FG = '#FFFFFF';
 
 /** Everything the slip prints, read once so the popup and the PNG agree. */
 function slipData(state, b) {
@@ -39,7 +41,7 @@ function slipData(state, b) {
 /* ---------- the PNG ---------- */
 /**
  * Draws the slip at 1080×1350 — big enough to keep on a phone or print, small
- * enough to save instantly. Solid fills only, same yellow and same ink as the
+ * enough to save instantly. Solid fills only, same rose and same white as the
  * popup on screen.
  */
 function drawSlip(data) {
@@ -50,14 +52,14 @@ function drawSlip(data) {
   cv.height = H;
   const c = cv.getContext('2d');
 
-  c.fillStyle = AMBER;
+  c.fillStyle = SLIP_BG;
   c.fillRect(0, 0, W, H);
 
-  c.strokeStyle = INK;
+  c.strokeStyle = SLIP_FG;
   c.lineWidth = 4;
   c.strokeRect(44, 44, W - 88, H - 88);
 
-  c.fillStyle = INK;
+  c.fillStyle = SLIP_FG;
   c.textBaseline = 'alphabetic';
 
   const mono = (size, weight = 500) => `${weight} ${size}px "JetBrains Mono", ui-monospace, monospace`;

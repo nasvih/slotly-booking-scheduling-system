@@ -1,10 +1,53 @@
 /* ============================================================
    slotly — app-specific components.
-   Loaded after app.css. Uses only the tokens defined there.
+   Loaded after app.css. Uses the tokens defined there, and overrides
+   the accent ones (section 0) to slotly's own rose.
    Solid fills only: no gradients, no blur, no glow.
-   1 layout bits · 2 queue · 3 calendar · 4 slot picker
+   0 accent · 1 layout bits · 2 queue · 3 calendar · 4 slot picker
    5 staff + hours · 6 templates · 7 drawer detail · 8 responsive
    ============================================================ */
+
+/* == 0. accent ==
+   slotly is rose, not the kit's yellow. The token NAMES stay --amber-* so
+   nothing else in the app or the kit has to change; only the values move.
+   The structure is the kit's, unchanged: --amber-fill is the FILL, the two
+   --deep/--darker shades are the readable text-on-white pair, --soft/--line
+   are the tint and hairline for selected states, --on-amber is what sits on
+   the fill.
+
+   The one thing that does change is the polarity. #EAC81C is a light ground
+   that carries ink; #B82D6E is a dark ground that carries white, so every
+   place the kit paired ink with the fill is flipped below and in 7b/7e/7f.
+
+   Contrast, measured not guessed (WCAG 2.1 relative luminance):
+     #FFFFFF on #B82D6E ............ 5.77:1   (text on the fill)
+     rgba(255,255,255,.88) on fill .. 4.80:1   (quiet text on the fill)
+     #98215C on #FFFFFF ............ 7.76:1   (--amber-deep, text on white)
+     #98215C on #FAE6F4 ............ 6.53:1   (--amber-deep on the tint)
+     #731648 on #FFFFFF ............ 10.84:1  (--amber-darker)
+     #FFFFFF on #A02460 ............ 7.20:1   (the hover fill)
+     fill vs #FFFFFF page .......... 5.77:1   (the fill's own edge, light)
+     fill vs #191A1D surface ....... 3.01:1   (the fill's own edge, dark)
+   Dark theme:
+     #FF8FBE on #191A1D ............ 8.22:1   (--amber-deep)
+     #FF8FBE on #2E1226 ............ 8.06:1   (--amber-deep on the tint)
+     #FFB6D3 on #191A1D ............ 10.67:1  (--amber-darker)
+
+   The hue sits at 332°, well clear of --bad (#B3261E, 8°), so a selected
+   slot and a cancelled booking never read as the same colour. */
+:root{
+  --amber:#B82D6E;       --amber-deep:#98215C;   --amber-darker:#731648;
+  --amber-fill:#B82D6E;  --amber-fill-hi:#A02460;
+  --amber-soft:#FAE6F4;  --amber-line:#EEB9D8;   --on-amber:#FFFFFF;
+  /* the kit's hover tint is the accent at its faintest, so it moves too */
+  --hover:#FEF6FB;
+}
+[data-theme="dark"]{
+  --amber-soft:#2E1226;  --amber-line:#55223F;   --amber-deep:#FF8FBE;  --amber-darker:#FFB6D3;
+  --hover:#2A1626;
+}
+/* the kit sets ink on the fill here because yellow is light; rose is not */
+::selection{background:var(--amber-fill);color:#FFFFFF}
 
 /* == 1. layout bits == */
 button.pill{cursor:pointer;font-family:var(--mono)}
@@ -134,16 +177,49 @@ button.pill:hover{border-color:var(--amber)}
    modal wider than the 390px viewport */
 .aboutlink{font-size:11.5px;overflow-wrap:anywhere}
 
-/* == 7b. sidebar footer: links + install ==
-   The yellow sidebar is the default here, so anything in the footer is read
-   against #EAC81C first and against white second. Ink on yellow, never white.
-   app.css owns the focus ring and the quiet-text colour on yellow; what is
-   below is only the parts that are this app's own markup. */
+/* == 7b. the rose sidebar ==
+   The kit's tone mode was drawn for a light yellow fill carrying ink text.
+   Rose is a dark ground, so the polarity of the whole subtree flips: white
+   type, white hairlines, white-tinted hovers. Everything below restates a
+   rule app.css writes with ink in it — same selectors, same structure, only
+   the side of the fill the colour comes from.
 
-/* the author line follows app.css's rule for quiet text on yellow: --ink-2 at
-   8:1, not --amber-darker, which falls under AA against the fill */
-.side[data-tone="amber"] .side__sub{color:var(--ink-2)}
-.side[data-tone="amber"] .side__sub .linkish{border-bottom-color:var(--ink-2)}
+   White on #B82D6E is 5.77:1 and the quiet text (white at 88%) is 4.80:1.
+   The active row and every control keep a white ground with ink or rose type
+   on them, which is the same move the yellow sidebar made — a white pill on
+   the fill — and it survives the flip unchanged. These rules carry no theme
+   selector because the fill is the same colour in both themes. */
+.side[data-tone="amber"]{--line:rgba(255,255,255,.24);--line-2:rgba(255,255,255,.34);--hover:rgba(255,255,255,.14)}
+.side[data-tone="amber"] .side__brand,
+.side[data-tone="amber"] .side__foot,
+.side[data-tone="amber"] .navgroup+.navgroup{border-color:rgba(255,255,255,.24)}
+/* the brand square inverts: a white tile with the rose glyph, because ink on
+   rose is only 2.9:1 and a 12px mono letter cannot live there */
+.side[data-tone="amber"] .mark{background:#FFFFFF;color:var(--amber-deep)}
+.side[data-tone="amber"] .side__name{color:#FFFFFF}
+.side[data-tone="amber"] .navlink{color:#FFFFFF}
+.side[data-tone="amber"] .navlink svg{color:rgba(255,255,255,.88)}
+/* quiet text on the fill: white at 88% (4.80:1). --amber-darker was the
+   yellow sidebar's answer here and it is a dark shade — unusable on rose. */
+.side[data-tone="amber"] .side__tag,
+.side[data-tone="amber"] .navgroup__label,
+.side[data-tone="amber"] .navlink__count,
+.side[data-tone="amber"] .side__sub{color:rgba(255,255,255,.88)}
+.side[data-tone="amber"] .side__sub .linkish{border-bottom-color:rgba(255,255,255,.6)}
+.side[data-tone="amber"] .navlink:hover{background:rgba(255,255,255,.14)}
+.side[data-tone="amber"] .navlink.is-active{background:#FFFFFF;color:#17181A}
+.side[data-tone="amber"] .navlink.is-active svg{color:var(--amber-deep)}
+/* the active row is a white pill on rose; a hover tint over it only muddies
+   the state */
+.side[data-tone="amber"] .navlink.is-active:hover{background:#FFFFFF}
+/* the kit rings focus with --ink here because ink reads on yellow; on rose
+   the ring has to be the white one */
+.side[data-tone="amber"] :focus-visible{outline-color:#FFFFFF}
+
+/* == 7b2. sidebar footer: links + install ==
+   Everything in the footer is read against #B82D6E first and against white
+   second: the controls are white grounds with ink on them, and the one dark
+   link keeps its inverted ground. */
 
 /* The footer is About on its own, then two paired rows. Everything inside a
    pair is a control rather than a nav row, so it carries a hairline — except
@@ -152,29 +228,34 @@ button.pill:hover{border-color:var(--amber)}
 .side__foot .side__pair{margin-top:6px}
 .side__pair .navlink:not(.sitelink){border:1px solid var(--line-2)}
 .side__pair .navlink:not(.sitelink):hover{background:var(--hover);border-color:var(--amber-line)}
-.side[data-tone="amber"] .side__pair .navlink:not(.sitelink){background:rgba(255,255,255,.72);border-color:rgba(23,24,26,.24)}
-.side[data-tone="amber"] .side__pair .navlink:not(.sitelink) svg{color:var(--ink-2)}
-.side[data-tone="amber"] .side__pair .navlink:not(.sitelink):hover{background:var(--bg)}
+/* on the fill the controls stand as near-white tiles with ink type: white at
+   92% over rose is 13.9:1 for ink, and the tile itself is 5.2:1 off the fill */
+.side[data-tone="amber"] .btn,
+.side[data-tone="amber"] .side__brandbtns .btn,
+.side[data-tone="amber"] .side__pair .navlink:not(.sitelink){background:rgba(255,255,255,.92);border-color:rgba(23,24,26,.2);color:#17181A}
+.side[data-tone="amber"] .btn:hover,
+.side[data-tone="amber"] .side__brandbtns .btn:hover,
+.side[data-tone="amber"] .side__pair .navlink:not(.sitelink):hover{background:#FFFFFF;border-color:rgba(23,24,26,.3)}
+.side[data-tone="amber"] .btn svg,
+.side[data-tone="amber"] .side__brandbtns .btn svg,
+.side[data-tone="amber"] .side__pair .navlink:not(.sitelink) svg{color:#2E3033}
 /* a paired label truncates rather than pushing its neighbour out of the row */
 .side__pair .navlink{min-width:0;gap:7px;padding:8px}
 .side__pair .navlink span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* the one dark element in the sidebar. Ink ground, white type — 16:1 either way,
-   and it reads as deliberate against the yellow rather than as a hole in it. */
+   and it reads as deliberate against the rose rather than as a hole in it. */
 .sitelink{background:var(--night);color:#FFFFFF}
 .sitelink svg{color:#FFFFFF}
 .sitelink:hover{background:var(--night-2);color:#FFFFFF}
-/* the kit's amber rules repaint every .navlink, so the dark one opts back out */
-.side[data-tone="amber"] .sitelink{color:#FFFFFF}
+/* the kit's tone rules repaint every .navlink, so the dark one opts back out */
+.side[data-tone="amber"] .sitelink{background:var(--night);color:#FFFFFF}
 .side[data-tone="amber"] .sitelink svg{color:#FFFFFF}
 .side[data-tone="amber"] .sitelink:hover{background:var(--night-2)}
 
 /* the source link is an outline control, not a second inverted one — the
    nasvih.in link stays the only dark element in the footer */
 .srclink svg{color:var(--ink-2)}
-
-/* the active row is white on yellow; a hover tint over it only muddies the state */
-.side[data-tone="amber"] .navlink.is-active:hover{background:var(--bg)}
 
 /* == 7c. topbar: demo/about button and the chrome controls ==
    Title, then everything else. The title is the only thing allowed to shrink,
@@ -214,8 +295,8 @@ button.pill:hover{border-color:var(--amber)}
 .notepanel__foot{padding:10px 14px;border-top:1px solid var(--line);line-height:1.5}
 
 /* == 7e. the token slip ==
-   Plain yellow ground, black type, nothing else on it. Ink on #EAC81C is
-   10.8:1, so every colour here is fixed against the fill rather than against
+   Plain rose ground, white type, nothing else on it. White on #B82D6E is
+   5.77:1, so every colour here is fixed against the fill rather than against
    the page — which is why it reads the same in dark mode.
    The scrim scrolls, so the slip is centred with auto margins rather than with
    place-items: centring a grid item taller than its scroll container puts its
@@ -225,37 +306,42 @@ button.pill:hover{border-color:var(--amber)}
 .tokenpop{width:min(420px,100%);margin:auto;background:var(--amber-fill);color:var(--on-amber);border:1px solid var(--on-amber);border-radius:var(--r-lg);box-shadow:var(--shadow-3);padding:16px 20px 18px;text-align:center}
 .tokenpop__head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .tokenpop__eyebrow{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
-.tokenpop__x{width:30px;height:30px;flex:none;border-radius:var(--r-sm);border:1px solid rgba(23,24,26,.3);background:rgba(255,255,255,.6);color:var(--on-amber);display:grid;place-items:center;cursor:pointer;padding:0}
+.tokenpop__x{width:30px;height:30px;flex:none;border-radius:var(--r-sm);border:1px solid rgba(255,255,255,.55);background:transparent;color:var(--on-amber);display:grid;place-items:center;cursor:pointer;padding:0}
 .tokenpop__x svg{width:16px;height:16px}
-.tokenpop__x:hover{background:#fff}
-.tokenpop__label{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-top:14px;color:rgba(23,24,26,.78)}
+.tokenpop__x:hover{background:rgba(255,255,255,.14)}
+.tokenpop__label{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-top:14px;color:rgba(255,255,255,.88)}
 .tokenpop__num{font-family:var(--mono);font-size:clamp(58px,17vw,86px);font-weight:700;line-height:1.02;letter-spacing:-.03em;margin-top:4px}
 .tokenpop__ref{font-family:var(--mono);font-size:14px;font-weight:600;letter-spacing:.1em;margin-top:4px}
-.tokenpop__kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;text-align:left;margin-top:16px;padding-top:14px;border-top:1px solid rgba(23,24,26,.3)}
-.tokenpop__kv dt{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(23,24,26,.74);padding-top:2px}
+.tokenpop__kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;text-align:left;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.35)}
+.tokenpop__kv dt{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.88);padding-top:2px}
 .tokenpop__kv dd{font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
-.tokenpop__note{text-align:left;font-size:12px;line-height:1.5;margin-top:14px;color:rgba(23,24,26,.82)}
+.tokenpop__note{text-align:left;font-size:12px;line-height:1.5;margin-top:14px;color:rgba(255,255,255,.9)}
 .tokenpop__foot{display:flex;gap:8px;margin-top:16px}
 .tokenpop__foot .btn{flex:1}
-.tokenpop__dl{background:var(--on-amber);border-color:var(--on-amber);color:var(--amber-fill)}
-.tokenpop__dl:hover{background:#000;border-color:#000;color:var(--amber-fill)}
-.tokenpop__dl svg{color:var(--amber-fill)}
-.tokenpop__done{background:rgba(255,255,255,.7);border-color:rgba(23,24,26,.3);color:var(--on-amber)}
-.tokenpop__done:hover{background:#fff;border-color:rgba(23,24,26,.45)}
+/* the primary is the solid one: a white slab with rose type (7.8:1); the
+   secondary is an outline: white type straight on the fill (5.77:1), and
+   its hover tint stops at 14% so the type is still 4.57:1 */
+/* literal shades, not --amber-deep: the slip is fixed against the fill, and
+   --amber-deep is a light pink in the dark palette that would vanish here */
+.tokenpop__dl{background:#FFFFFF;border-color:#FFFFFF;color:#98215C}
+.tokenpop__dl:hover{background:#FAE6F4;border-color:#FAE6F4;color:#98215C}
+.tokenpop__dl svg{color:#98215C}
+.tokenpop__done{background:transparent;border-color:rgba(255,255,255,.55);color:var(--on-amber)}
+.tokenpop__done:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.8)}
 .tokenpop :focus-visible{outline-color:var(--on-amber)}
 
 /* == 7f. device preview ==
    A real iframe at 390×844 inside a bezel, so the app's own breakpoints fire
-   for the honest reason. Yellow surround, ink text — the usual pairing. */
+   for the honest reason. Rose surround, white text — the usual pairing. */
 .devstage{position:fixed;inset:0;z-index:90;background:var(--amber-fill);color:var(--on-amber);display:flex;flex-direction:column;align-items:center;padding:16px 16px 0;overflow:hidden}
 .devstage__head{width:100%;max-width:560px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
 .devstage__name{font-size:18px;font-weight:700;letter-spacing:-.02em}
-.devstage__sub{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:rgba(23,24,26,.75);margin-top:2px}
+.devstage__sub{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.88);margin-top:2px}
 .devstage__body{flex:1;width:100%;display:flex;justify-content:center;align-items:flex-start;min-height:0}
 .devbezel{width:414px;height:868px;flex:none;padding:12px;border-radius:46px;background:#17181A;box-shadow:var(--shadow-3);transform-origin:top center}
 .devframe{width:390px;height:844px;border:0;border-radius:34px;background:var(--bg);display:block}
-.devstage .btn{background:rgba(255,255,255,.8);border-color:rgba(23,24,26,.3);color:var(--on-amber)}
-.devstage .btn:hover{background:#fff;border-color:rgba(23,24,26,.5)}
+.devstage .btn{background:transparent;border-color:rgba(255,255,255,.55);color:var(--on-amber)}
+.devstage .btn:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.8)}
 .devstage :focus-visible{outline-color:var(--on-amber)}
 
 /* == 7g. worked examples in the About modal == */
@@ -271,34 +357,24 @@ button.pill:hover{border-color:var(--amber)}
 
 /* == 7i. dark mode corrections ==
    app.css ships the palette; these are the places where this app's own markup
-   would otherwise inherit the wrong side of it. The rule that matters: yellow
-   is a fill and the text on it stays ink, in either theme. */
-[data-theme="dark"] .side[data-tone="amber"]{border-right-color:rgba(23,24,26,.35)}
-[data-theme="dark"] .side[data-tone="amber"] .side__name,
-[data-theme="dark"] .side[data-tone="amber"] .navlink,
-[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active{color:var(--on-amber)}
-[data-theme="dark"] .side[data-tone="amber"] .side__tag,
-[data-theme="dark"] .side[data-tone="amber"] .navgroup__label,
-[data-theme="dark"] .side[data-tone="amber"] .navlink__count,
-[data-theme="dark"] .side[data-tone="amber"] .side__sub{color:#3B3D40}
-[data-theme="dark"] .side[data-tone="amber"] .side__sub .linkish{border-bottom-color:#3B3D40}
-[data-theme="dark"] .side[data-tone="amber"] .navlink svg{color:#6B5400}
-[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active{background:#FFFFFF}
-[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active svg{color:#6B5400}
-[data-theme="dark"] .side[data-tone="amber"] .navlink:hover{background:rgba(23,24,26,.1)}
-[data-theme="dark"] .side[data-tone="amber"] .navlink.is-active:hover{background:#FFFFFF}
-[data-theme="dark"] .side[data-tone="amber"] .mark{background:var(--on-amber);color:var(--amber-fill)}
-[data-theme="dark"] .side[data-tone="amber"] .btn,
-[data-theme="dark"] .side[data-tone="amber"] .side__pair .navlink:not(.sitelink){background:rgba(255,255,255,.78);border-color:rgba(23,24,26,.3);color:var(--on-amber)}
-[data-theme="dark"] .side[data-tone="amber"] .btn:hover,
-[data-theme="dark"] .side[data-tone="amber"] .side__pair .navlink:not(.sitelink):hover{background:#fff}
-[data-theme="dark"] .side[data-tone="amber"] .side__pair .navlink:not(.sitelink) svg{color:#3B3D40}
-[data-theme="dark"] .side[data-tone="amber"] :focus-visible{outline-color:var(--on-amber)}
-/* the inverted link needs a ground that still reads as deliberate on yellow */
+   would otherwise inherit the wrong side of it.
+
+   The kit re-pins the whole light palette inside the tone sidebar in dark
+   mode, because #EAC81C is a light surface that the dark theme's near-white
+   ink would land on at 1.9:1. #B82D6E is a dark surface, so that reasoning
+   inverts: the rose sidebar wants the same white type it has in light mode,
+   which the theme-free rules in 7b already give it. All that is left to undo
+   is the accent pair the kit re-pinned to its yellow shades — they are read
+   on the white active pill and the white footer tiles, so they have to be
+   the rose text shades, not the yellow ones. */
+[data-theme="dark"] .side[data-tone="amber"]{
+  --amber-deep:#98215C; --amber-darker:#731648;
+  border-right-color:var(--amber-fill-hi);
+}
+/* the inverted link needs a ground that still reads as deliberate on rose */
 [data-theme="dark"] .sitelink{background:#101113}
-[data-theme="dark"] .side[data-tone="amber"] .sitelink,
-[data-theme="dark"] .side[data-tone="amber"] .sitelink svg{color:#FFFFFF}
-/* switch knob and the yellow controls keep ink on them */
+/* switch knob: the unchecked one sits on a dark track, the checked one is a
+   white dot on the rose fill */
 [data-theme="dark"] .switch__track::after{background:var(--surface)}
 [data-theme="dark"] .switch input:checked+.switch__track::after{background:var(--on-amber)}
 [data-theme="dark"] .slotbtn.is-on small{color:var(--on-amber)}

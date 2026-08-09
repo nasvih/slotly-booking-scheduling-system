@@ -27,7 +27,7 @@ export function applyTheme(mode) {
   else document.documentElement.removeAttribute('data-theme');
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', dark ? '#141517' : '#EAC81C');
+  if (meta) meta.setAttribute('content', dark ? '#141517' : '#B82D6E');
 }
 
 /**

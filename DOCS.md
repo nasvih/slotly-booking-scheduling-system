@@ -325,7 +325,7 @@ the accessible name have to do all the work.
 | Control | Effect |
 |---|---|
 | **Collapse sidebar / Expand sidebar** | Toggles `is-rail` on the `.shell` element: a 64px icon rail with labels, group headings and counts hidden. `title` and `aria-label` name the action and follow the state; the glyph is a panel with a chevron pointing at the edge the sidebar is about to move to. |
-| **Sidebar colour** | Toggles `data-tone="amber"` on the `.side` element. It names no colour in the interface or in the accessible name — the glyph, a circle half filled, carries that, and `aria-pressed` reports whether the yellow tone is on. |
+| **Sidebar colour** | Toggles `data-tone="amber"` on the `.side` element. It names no colour in the interface or in the accessible name — the glyph, a circle half filled, carries that, and `aria-pressed` reports whether the rose tone is on. |
 
 In rail mode `.shell.is-rail .side__brandbtns` stacks the pair into a column under the mark,
 so both stay reachable inside 64px. Below 900px the collapse control is hidden in
@@ -348,27 +348,30 @@ links carry `target="_blank" rel="noopener noreferrer"` and an `aria-label` that
 open in a new tab. In rail mode every footer control collapses to its icon in one column,
 with the label still on `title` and `aria-label`.
 
-### The yellow sidebar is the default
+### The rose sidebar is the default
 
 `data-tone="amber"` is applied when **nothing is stored**. Only an explicit press of the
 colour control writes `{"tone":"plain"}` and gives the plain white sidebar back, so a fresh
-browser always opens yellow. Nothing is written on load — "no stored preference" stays
+browser always opens rose. Nothing is written on load — "no stored preference" stays
 literally true until the control is used.
 
-`assets/app.css` inks the yellow sidebar: ink `#17181A` on `#EAC81C` is 10.8:1, the brand mark
-inverts to an ink tile, quiet text (the tag line, group headings, nav counts) goes to
-`--ink-2` at 8:1 rather than `--amber-darker` which falls under AA against the fill, the focus
-ring switches from `--amber` — invisible on yellow — to ink, the active row becomes a solid
-white card, and the footer buttons sit on a translucent white. **Never white text on yellow.**
+`assets/app.css` writes that sidebar for a *light* fill: it inks the type, because ink on the
+kit's `#EAC81C` is 10.8:1. Rose is a dark fill — ink on `#B82D6E` is only 3.1:1 — so
+`assets/slotly.css` section 7b flips the whole subtree and restates every one of those rules
+from the other side. White on `#B82D6E` is 5.77:1, quiet text is white at 88% (4.80:1), the
+brand mark inverts to a white tile with the rose glyph, the focus ring switches from `--amber`
+— invisible on the fill — to white, the active row stays a solid white card with ink type, and
+the footer controls sit on white at 92% with ink type. **Never ink text on rose.** These rules
+carry no theme selector: the fill is the same colour in both themes, so the sidebar is too.
 
-`assets/slotly.css` adds only what is this app's own markup:
+`assets/slotly.css` also adds what is this app's own markup:
 
 | Rule | Why |
 |---|---|
-| `.side[data-tone="amber"] .side__sub` → `--ink-2` | The author line is ours, so it follows the same AA rule as the kit's quiet text instead of staying `--faint` grey on yellow. |
+| `.side[data-tone="amber"] .side__sub` → white at 88% | The author line is ours, so it follows the same AA rule as the kit's quiet text instead of staying `--faint` grey on the fill. |
 | `.side[data-tone="amber"] .navlink.is-active:hover` pinned to `--bg` | The generic hover tint only muddied the white active card. |
-| `.sitelink` on `--night` with white type | The one inverted element in the sidebar. It stands out against yellow without adding a colour that is not already a token, and it still reads on the white sidebar. Hover goes to `--night-2`. |
-| `.side__pair .navlink:not(.sitelink)` with a `--line-2` border | Everything sharing a paired row reads as a control rather than a nav row, so it takes a hairline — deliberately not a second dark one, because one inverted element in the footer is a focal point and two is a pattern. On yellow they take a translucent white ground. |
+| `.sitelink` on `--night` with white type | The one inverted element in the sidebar. It stands out against rose without adding a colour that is not already a token, and it still reads on the white sidebar. Hover goes to `--night-2`. |
+| `.side__pair .navlink:not(.sitelink)` with a `--line-2` border | Everything sharing a paired row reads as a control rather than a nav row, so it takes a hairline — deliberately not a second dark one, because one inverted element in the footer is a focal point and two is a pattern. On rose they take a near-white ground with ink type. |
 
 Both tones and the rail were checked in a browser at 1280px and 390px.
 
@@ -405,11 +408,12 @@ number, focus moved to **Download** on open and returned to the opener on close,
 inside the dialog, `Escape` and the close button and a scrim click all exit.
 
 The slip is `--amber-fill` with `--on-amber` text, and every quiet colour on it is an alpha of
-ink rather than a theme token — which is why it looks the same in dark mode. Ink on `#EAC81C`
-is 10.8:1.
+white rather than a theme token — which is why it looks the same in dark mode. White on
+`#B82D6E` is 5.77:1. The **Download** button names `#98215C` literally rather than
+`--amber-deep`, which is a light pink in the dark palette and would vanish on its white slab.
 
-`drawSlip(data)` paints the same content on an offscreen 1080 × 1350 canvas: solid yellow
-ground, inset ink rule, the desk name, the token at 232px mono, the reference, then the five
+`drawSlip(data)` paints the same content on an offscreen 1080 × 1350 canvas: solid rose
+ground, inset white rule, the desk name, the token at 232px mono, the reference, then the five
 detail rows, then the footer line. `document.fonts.ready` is awaited first so the canvas gets
 Inter and JetBrains Mono rather than a fallback, long values are trimmed with an ellipsis to
 the width available, and `canvas.toBlob(…, 'image/png')` feeds an object URL to a temporary
@@ -424,13 +428,16 @@ kept rather than the temporary one it was created with.
 
 `assets/app.css` ships the palette under `[data-theme="dark"]`: surfaces go dark, hairlines
 lift, the status colours brighten, and `--amber-fill` and `--on-amber` do not move at all. The
-rule that survives the theme is the same one that governs the light build — **the yellow is a
-fill and the text on it is ink**.
+rule that survives the theme is the same one that governs the light build — **the rose is a
+fill and the text on it is white**.
 
-`assets/slotly.css` adds only the corrections this app's own markup needs. The yellow sidebar
-paints its text with `--ink`, which is near-white in dark mode, so every rule that puts type on
-`data-tone="amber"` is re-pinned to `--on-amber` (and quiet text to `#3B3D40`, 8.5:1 against
-the fill). The active nav row stays a solid white card. The switch knob, the calendar event
+`assets/slotly.css` section 0 overrides the dark accent tokens too (`--amber-soft` `#2E1226`,
+`--amber-line` `#55223F`, `--amber-deep` `#FF8FBE` at 8.2:1 on the dark surface, `--amber-darker`
+`#FFB6D3`), or dark mode would still be yellow. The kit re-pins the whole *light* palette inside
+`data-tone="amber"` in dark mode, because its yellow is a light surface the dark theme's ink
+would land on at 1.9:1; rose is a dark surface, so that reasoning inverts and section 7i undoes
+all of it except the accent text pair, which is read on the white active pill and the white
+footer tiles and so has to stay the rose shades. The active nav row stays a solid white card. The switch knob, the calendar event
 bars and the uptime-style strips get the same treatment.
 
 Checked screen by screen at 1280px and 390px in both themes: Today, Calendar, Bookings,
@@ -443,11 +450,11 @@ Three files, no build step and no dependency.
 
 | File | Job |
 |---|---|
-| `manifest.webmanifest` | `name`/`short_name` **Slotly**, one-line description, `start_url` and `scope` both `./` so it works from a Pages subdirectory, `display: standalone`, `background_color: #FFFFFF`, `theme_color: #EAC81C`, `lang: en`, categories, and three icons — 192 and 512 as `purpose: "any"`, plus a 512 as `purpose: "maskable"` for Android's shaped icons. |
+| `manifest.webmanifest` | `name`/`short_name` **Slotly**, one-line description, `start_url` and `scope` both `./` so it works from a Pages subdirectory, `display: standalone`, `background_color: #FFFFFF`, `theme_color: #B82D6E`, `lang: en`, categories, and three icons — 192 and 512 as `purpose: "any"`, plus a 512 as `purpose: "maskable"` for Android's shaped icons. |
 | `sw.js` | Cache-first service worker over one versioned cache keyed on the registration scope. `install` pre-caches `SHELL`, `activate` deletes every older cache under the same scope and claims open clients, `fetch` serves same-origin assets from cache and falls back to `./index.html` for navigations so a reload works offline. |
 | `lib/pwa.js` | Registers the worker on `load`, captures `beforeinstallprompt`, and drives the **Install app** control. |
 
-`index.html` carries `<link rel="manifest">`, `<meta name="theme-color" content="#EAC81C">`,
+`index.html` carries `<link rel="manifest">`, `<meta name="theme-color" content="#B82D6E">`,
 an `apple-touch-icon` and the `apple-mobile-web-app-*` pair that gives iOS a standalone window
 and the right home-screen name.
 
@@ -497,12 +504,12 @@ Defined in `assets/app.css` under `:root`. Use the variable, never the literal.
 |---|---|---|
 | `--bg`, `--surface` | `#FFFFFF` | Page and card ground |
 | `--surface-2` | `#FAFAF8` | Table heads, muted cells, log ground |
-| `--hover` | `#FEFBEA` | Row and button hover |
+| `--hover` | `#FEF6FB` | Row and button hover (overridden in `slotly.css`) |
 | `--ink`, `--ink-2`, `--muted`, `--faint` | `#17181A` → `#686E75` | Text ramp |
 | `--line`, `--line-2` | `#E7E7E4`, `#D8D8D3` | Hairlines |
-| `--amber`, `--amber-fill` | `#EAC81C` | The brand yellow, **as a fill with ink text** |
-| `--amber-deep` | `#8A6D00` | Yellow *text* on white — never `--amber` for type |
-| `--amber-soft`, `--amber-line` | `#FEF9DA`, `#F0DE8C` | Selected and accent surfaces |
+| `--amber`, `--amber-fill` | `#B82D6E` | The brand rose, **as a fill with white text** (`slotly.css` §0) |
+| `--amber-deep`, `--amber-darker` | `#98215C`, `#731648` | Rose *text* on white (7.76:1, 10.84:1) — never `--amber` for type |
+| `--amber-soft`, `--amber-line` | `#FAE6F4`, `#EEB9D8` | Selected and accent surfaces |
 | `--ok` `--warn` `--bad` `--info` | solid | Status, each paired with `-soft` and `-line` |
 | `--r-lg` `--r` `--r-sm` `--r-xs` | 12 / 8 / 6 / 4 px | Radii |
 | `--sans` | Inter | UI |

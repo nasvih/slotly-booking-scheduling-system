@@ -186,7 +186,7 @@ resetBtn.addEventListener('click', async () => {
   toast('Demo data reset', 'ok');
 });
 
-/* The one dark element in the sidebar: it has to stand out against the yellow
+/* The one dark element in the sidebar: it has to stand out against the rose
    default without introducing a colour that is not already in the tokens. */
 const EXTERNAL = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 11.5v4a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1h4"/><path d="M11.5 3.5h5v5"/><path d="M9 11l7.5-7.5"/></svg>';
 const siteLink = h('a', {
@@ -219,8 +219,8 @@ const ui = (() => {
 })();
 const saveUI = () => { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch (_) {} };
 
-/* The brand yellow sidebar is the default. Only an explicit choice stored under
-   this key can turn it off, so a fresh browser always opens yellow. Nothing is
+/* The brand rose sidebar is the default. Only an explicit choice stored under
+   this key can turn it off, so a fresh browser always opens rose. Nothing is
    written back here — "no stored preference" stays literally true until the
    owner presses the control. */
 if (!('tone' in ui)) ui.tone = 'amber';
@@ -241,7 +241,7 @@ const RAIL_GLYPH = {
 };
 const TONE_GLYPH = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.6"/><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2z" fill="currentColor" stroke="none"/></svg>';
 /* the colour control names no colour at all: the glyph carries it and
-   aria-pressed reports whether the yellow tone is on */
+   aria-pressed reports whether the rose tone is on */
 const TONE_LABEL = 'Sidebar colour';
 
 const railBtn = h('button', {

@@ -97,7 +97,7 @@ The same blocks are in the app, behind the **About this demo** button in the top
 ### The token slip
 
 Every booking — from the calendar, from the booking dialog or from the assistant — ends with a
-plain yellow slip on black type: the token in large mono, the `SL-…` reference under it, then
+plain rose slip in white type: the token in large mono, the `SL-…` reference under it, then
 customer, service, staff, date and time. **Download** draws the same slip on a `<canvas>` at
 1080 × 1350 and saves it as a PNG the visitor can keep; a line on the popup says a screenshot
 works too. It is never a one-time thing — every booking row on **Today** and in **Bookings**
@@ -109,11 +109,11 @@ has a **Token** button that shows it again, and so does the row detail drawer.
 |---|---|
 | **About this demo** | The modal: what this is, where it helps, what the assistant can change (with a worked example each), how the demo works, and where to read the source. |
 | **Notifications** | A bell with an unread count. The list is worked out from the live bookings every time it opens: anything starting within the hour, today's no-shows, cancellations in the week ahead, and anyone running over or booked past their hours. Mark one or all read; the read marks persist under `slotly.notify`. Empty state when the desk is clear. |
-| **Device preview** | Phone and desktop icons. Phone mode drops the whole app into a 390 × 844 `<iframe>` inside a rounded bezel on a yellow surround, so the real breakpoints fire for the real reason. The framed copy carries `?frame=1` and hides the control, so there is no preview inside the preview. |
-| **Dark mode** | Sets `data-theme="dark"` on `<html>` and persists it under `slotly.theme`. On a first visit it follows `prefers-color-scheme`, and keeps following the system until you press the switch. The yellow stays a fill with ink text in both themes. |
+| **Device preview** | Phone and desktop icons. Phone mode drops the whole app into a 390 × 844 `<iframe>` inside a rounded bezel on a rose surround, so the real breakpoints fire for the real reason. The framed copy carries `?frame=1` and hides the control, so there is no preview inside the preview. |
+| **Dark mode** | Sets `data-theme="dark"` on `<html>` and persists it under `slotly.theme`. On a first visit it follows `prefers-color-scheme`, and keeps following the system until you press the switch. The rose stays a fill with white text in both themes. |
 
-The sidebar is the brand yellow by default, with ink text on it. Two icon-only controls sit on
-the brand row at the top, right of the name: a circle half filled switches between yellow and
+The sidebar is the brand rose by default, with white text on it. Two icon-only controls sit on
+the brand row at the top, right of the name: a circle half filled switches between rose and
 plain white (labelled *Sidebar colour* — it names no colour, and `aria-pressed` carries the
 tone), and a panel with a chevron collapses the sidebar to a 64px icon rail. Both choices
 persist under their own `slotly.ui` key, separate from the demo data. The footer below holds
@@ -176,10 +176,10 @@ the repository.
 | Path | Purpose |
 |---|---|
 | `index.html` | The single page. Fonts, stylesheets, manifest link, `<noscript>` line, module entry. |
-| `manifest.webmanifest` | Web app manifest: name, icons, `standalone` display, `#EAC81C` theme colour. |
+| `manifest.webmanifest` | Web app manifest: name, icons, `standalone` display, `#B82D6E` theme colour. |
 | `sw.js` | Service worker. Caches the shell listed in `SHELL` so the app opens offline. |
-| `assets/app.css` | Shared product design system: tokens, shell, buttons, tables, forms, modal, assistant. Unmodified. |
-| `assets/slotly.css` | App-specific components only — queue rows, calendar grid, slot picker, staff cards, template preview, sidebar footer. |
+| `assets/app.css` | Shared product design system: tokens, shell, buttons, tables, forms, modal, assistant. Unmodified — the accent tokens are overridden in `slotly.css`, never here. |
+| `assets/slotly.css` | The rose accent override (section 0) plus app-specific components — queue rows, calendar grid, slot picker, staff cards, template preview, sidebar footer. |
 | `assets/icons/` | Install icons: 192, 512 and a 512 maskable. |
 | `lib/ui.js` | DOM helpers, formatting, seeded random, `createStore`, hash router, toast, modal, confirm, CSV, bar chart, meter, icons. |
 | `lib/assistant.js` | The assistant engine: intent routing, word-by-word streaming, panel and launcher. |
