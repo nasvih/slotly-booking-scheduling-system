@@ -299,17 +299,6 @@ const publicBtn = h('a', {
   html: `${icon('eye')}<span>Booking page</span>`,
 });
 
-/* The same exit repeated at the head of the sidebar footer. Not redundancy for
-   its own sake: in rail mode the topbar is where the eye goes, in the phone
-   drawer the footer is, and neither is visible at the same time as the other. */
-const publicLink = h('a', {
-  class: 'navlink',
-  href: `#/${PUBLIC}`,
-  title: 'Booking page — the page customers see',
-  'aria-label': 'Booking page — the page customers see',
-  html: `${icon('eye')}<span>Booking page</span>`,
-});
-
 /* Footer: the way out, the two links, then install and reset. About moved to
    the topbar, where it sits next to the demo marker it explains.
    The paired rows share their width and truncate rather than overflow; the kit
@@ -317,7 +306,6 @@ const publicLink = h('a', {
 const installRow = h('div', { class: 'side__pair' }, resetBtn);
 
 sideEl.appendChild(h('div', { class: 'side__foot' },
-  h('div', { class: 'side__pair' }, publicLink),
   h('div', { class: 'side__pair' }, siteLink, srcLink),
   installRow,
   h('div', { class: 'side__sub small faint', style: 'padding:10px 10px 2px;line-height:1.5' },
