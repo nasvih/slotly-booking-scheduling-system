@@ -27,17 +27,23 @@ export function applyTheme(mode) {
   else document.documentElement.removeAttribute('data-theme');
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', dark ? '#141517' : '#B82D6E');
+  if (meta) meta.setAttribute('content', dark ? '#141517' : '#0B7D74');
 }
+
+/* The app has two shells now — the booking page and the staff desk — and each
+   carries its own switch. Both are in the document at once, so a press has to
+   repaint the other one too or the second press would toggle from a stale
+   reading. The event carries nothing: every switch re-reads storage. */
+const THEME_EVENT = 'slotly:theme';
 
 /**
  * The switch itself. It only writes to storage when pressed — until then the
  * app follows the operating system, which is what a first visit should do.
  */
 export function themeToggle() {
-  let mode = readTheme();
   const btn = h('button', { class: 'btn btn--ghost btn--icon', type: 'button' });
   const paint = () => {
+    const mode = readTheme();
     applyTheme(mode);
     const label = mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
     btn.innerHTML = mode === 'dark' ? SUN : MOON;
@@ -46,21 +52,16 @@ export function themeToggle() {
     btn.title = label;
   };
   btn.addEventListener('click', () => {
-    mode = mode === 'dark' ? 'light' : 'dark';
-    try { localStorage.setItem(THEME_KEY, mode); } catch (_) { /* preference is lost, the app is not */ }
+    const next = readTheme() === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem(THEME_KEY, next); } catch (_) { /* preference is lost, the app is not */ }
     paint();
+    window.dispatchEvent(new CustomEvent(THEME_EVENT));
   });
+  window.addEventListener(THEME_EVENT, paint);
   /* Follow the system until somebody has actually chosen. */
   if (window.matchMedia) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const onSystem = () => {
-      let stored = null;
-      try { stored = localStorage.getItem(THEME_KEY); } catch (_) { stored = null; }
-      if (stored === 'dark' || stored === 'light') return;
-      mode = 'light';
-      paint();
-    };
-    if (mq.addEventListener) mq.addEventListener('change', onSystem);
+    if (mq.addEventListener) mq.addEventListener('change', paint);
   }
   paint();
   return btn;

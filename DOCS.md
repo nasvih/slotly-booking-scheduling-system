@@ -31,9 +31,9 @@ would not change.
 
 ## How this demo works
 
-**You can actually use it.** Every screen writes to the same store. Booking a slot blocks it
-on the calendar, puts a token in the Today queue and adds a row to Bookings. Nothing is
-read-only.
+**You can actually use it.** Every screen writes to the same store — including the customer's
+booking page, which is the point of it. Booking a slot blocks it on the calendar, puts a token
+in the Today queue and adds a row to Bookings. Nothing is read-only.
 
 **Your data stays on your machine.** State lives in `localStorage` under `slotly.v1`. There
 is no server, no account, no API, and no application code calls `fetch` — the only one in the
@@ -63,14 +63,25 @@ index.html
         ├── applyTheme(readTheme())                  src/chrome.js
         ├── createStore('slotly.v1', seedState)      lib/ui.js
         ├── ensureShape(store.state)                 src/data.js
-        ├── router({today, calendar, …}, onChange)   lib/ui.js
-        ├── shell: sidebar + topbar + #viewhost
+        ├── router({book, today, calendar, …})       lib/ui.js
+        ├── public shell: .pubbar + #pubhost + .pubfoot
+        ├── desk shell:   sidebar + topbar + #viewhost
         ├── topbar: mountBell(ctx)                   src/notify.js
         │           deviceControls(), themeToggle()  src/chrome.js
         ├── initPWA({mount, appName, onNote})        lib/pwa.js → sw.js
         ├── buildAgent(ctx).mount(document.body)     src/agent.js + src/actions.js
-        └── draw() → VIEWS[current].render(ctx) → Node
+        └── draw() → renderBook(ctx)                 src/views/book.js
+                  or VIEWS[current].render(ctx) → Node
 ```
+
+**Two shells, one store.** `book` is the first route, so a bare URL and anything
+unrecognised land on the customer's booking page; `#/today`, `#/calendar` and the other six
+still name their desk view exactly as before. `draw()` sets `hidden` on whichever shell is
+not in use (`[hidden]` is `display:none!important` in the kit, so the idle one is out of the
+layout, not merely invisible) and puts `is-public` on `<body>` while the customer's page is
+up, which is what takes the assistant launcher off the screen. The way in is the **Staff
+desk** control in the booking page's bar; the way back is **Booking page** at the head of the
+sidebar footer. There is no login — this is a demo, and a fake one would be theatre.
 
 `index.html` sets `data-theme` in a four-line inline script before the first paint, so the
 page never flashes white on the way into dark mode. `src/chrome.js` owns the same
@@ -195,6 +206,7 @@ Dates are never faked, only the time of day.
 | `src/booking.js` | `openBooking`, `openReschedule`, `cancelBooking`, `setStatus` | Today, Calendar, Bookings, Customers |
 | `src/drawer.js` | `drawer` | Bookings, Customers |
 | `src/agent.js` | `buildAgent`, plus the parsers re-exported from `parse.js` | `main.js` |
+| `src/views/book.js` | default `render(ctx)`, `resetBookingPage()` | `main.js` |
 | `src/views/*.js` | default `render(ctx)` | `main.js` |
 
 ### Assistant intents
@@ -314,7 +326,10 @@ already made for one of these files.
 | `Esc` | Close a dialog, drawer or the assistant |
 | `?` | Show the shortcut list |
 
-Shortcuts are ignored while typing in an input, a textarea or a select.
+Shortcuts are ignored while typing in an input, a textarea or a select, and every one of
+them is a desk shortcut: on the customer's booking page they are all inert. `⌘K` is caught
+in the capture phase there, because `lib/assistant.js` listens for it on the document and
+would otherwise open a panel behind the stylesheet that hides it.
 
 ## Sidebar chrome and footer
 
@@ -325,7 +340,7 @@ the accessible name have to do all the work.
 | Control | Effect |
 |---|---|
 | **Collapse sidebar / Expand sidebar** | Toggles `is-rail` on the `.shell` element: a 64px icon rail with labels, group headings and counts hidden. `title` and `aria-label` name the action and follow the state; the glyph is a panel with a chevron pointing at the edge the sidebar is about to move to. |
-| **Sidebar colour** | Toggles `data-tone="amber"` on the `.side` element. It names no colour in the interface or in the accessible name — the glyph, a circle half filled, carries that, and `aria-pressed` reports whether the rose tone is on. |
+| **Sidebar colour** | Toggles `data-tone="amber"` on the `.side` element. It names no colour in the interface or in the accessible name — the glyph, a circle half filled, carries that, and `aria-pressed` reports whether the teal tone is on. |
 
 In rail mode `.shell.is-rail .side__brandbtns` stacks the pair into a column under the mark,
 so both stay reachable inside 64px. Below 900px the collapse control is hidden in
@@ -348,20 +363,21 @@ links carry `target="_blank" rel="noopener noreferrer"` and an `aria-label` that
 open in a new tab. In rail mode every footer control collapses to its icon in one column,
 with the label still on `title` and `aria-label`.
 
-### The rose sidebar is the default
+### The teal sidebar is the default
 
 `data-tone="amber"` is applied when **nothing is stored**. Only an explicit press of the
 colour control writes `{"tone":"plain"}` and gives the plain white sidebar back, so a fresh
-browser always opens rose. Nothing is written on load — "no stored preference" stays
+browser always opens teal. Nothing is written on load — "no stored preference" stays
 literally true until the control is used.
 
 `assets/app.css` writes that sidebar for a *light* fill: it inks the type, because ink on the
-kit's `#EAC81C` is 10.8:1. Rose is a dark fill — ink on `#B82D6E` is only 3.1:1 — so
+kit's `#EAC81C` is 10.8:1. Teal is a dark fill — ink on `#0B7D74` is only 3.4:1 — so
 `assets/slotly.css` section 7b flips the whole subtree and restates every one of those rules
-from the other side. White on `#B82D6E` is 5.77:1, quiet text is white at 88% (4.80:1), the
-brand mark inverts to a white tile with the rose glyph, the focus ring switches from `--amber`
+from the other side. White on `#0B7D74` is 5.00:1, quiet text is white at 94% (4.61:1 — the
+88% an earlier, darker accent used falls to 4.24:1 on this lighter ground), the
+brand mark inverts to a white tile with the teal glyph, the focus ring switches from `--amber`
 — invisible on the fill — to white, the active row stays a solid white card with ink type, and
-the footer controls sit on white at 92% with ink type. **Never ink text on rose.** These rules
+the footer controls sit on white at 92% with ink type. **Never ink text on teal.** These rules
 carry no theme selector: the fill is the same colour in both themes, so the sidebar is too.
 
 `assets/slotly.css` also adds what is this app's own markup:
@@ -370,8 +386,8 @@ carry no theme selector: the fill is the same colour in both themes, so the side
 |---|---|
 | `.side[data-tone="amber"] .side__sub` → white at 88% | The author line is ours, so it follows the same AA rule as the kit's quiet text instead of staying `--faint` grey on the fill. |
 | `.side[data-tone="amber"] .navlink.is-active:hover` pinned to `--bg` | The generic hover tint only muddied the white active card. |
-| `.sitelink` on `--night` with white type | The one inverted element in the sidebar. It stands out against rose without adding a colour that is not already a token, and it still reads on the white sidebar. Hover goes to `--night-2`. |
-| `.side__pair .navlink:not(.sitelink)` with a `--line-2` border | Everything sharing a paired row reads as a control rather than a nav row, so it takes a hairline — deliberately not a second dark one, because one inverted element in the footer is a focal point and two is a pattern. On rose they take a near-white ground with ink type. |
+| `.sitelink` on `--night` with white type | The one inverted element in the sidebar. It stands out against teal without adding a colour that is not already a token, and it still reads on the white sidebar. Hover goes to `--night-2`. |
+| `.side__pair .navlink:not(.sitelink)` with a `--line-2` border | Everything sharing a paired row reads as a control rather than a nav row, so it takes a hairline — deliberately not a second dark one, because one inverted element in the footer is a focal point and two is a pattern. On teal they take a near-white ground with ink type. |
 
 Both tones and the rail were checked in a browser at 1280px and 390px.
 
@@ -380,6 +396,47 @@ the `is-rail` class is never applied there (guarded by a `matchMedia('(min-width
 check that also re-runs on resize) and the collapse control is hidden by CSS. The open drawer
 covers the menu button, so it closes on an outside click and on `Escape` as well as on
 navigation.
+
+## The booking page
+
+`src/views/book.js`. The screen the app opens on, and the only one written for somebody who
+does not work there. One column, capped at 640px, five plain questions down it — what do you
+need, which day, what time, anyone in particular, who are we booking for — then one button.
+No sidebar, no counts, no table, and none of the desk's vocabulary: no tokens issued, no
+chair time, no no-shows. It uses the kit's type scale, radii, hairlines and the same accent,
+so it is recognisably the same product from the other side.
+
+**It does not own any scheduling rules.** Every one comes from `src/data.js`, unchanged:
+`freeSlots` for the times on a day, `freeStaffAt` for who can take one, `isOpenDay` and
+`staffWorks` for closed days and empty rotas, `deskNowMin` for what counts as past,
+`createBooking` for the write and `assignTokens` inside it for the number. The booking is
+made in a single `store.update` that also creates the customer if the name and the last four
+digits of the number are new, so one write puts the appointment in the Today queue, on the
+calendar and in Bookings at once. `channel` is `Website`, and the history line says the
+customer booked it, which is the only thing about the record that differs from a desk one.
+The confirmation ends in the same `openToken` slip every other booking gets.
+
+| State | What it says |
+|---|---|
+| Desk closed today | "We are closed today (Sunday). The next day we open is Mon 10 Aug." Closed days stay on the strip, marked and unpressable, because a missing Sunday is a worse question than a greyed one. |
+| Today full | "Today is fully booked. The first free time is on Tue 11 Aug." |
+| Chosen day has nothing | An empty panel naming the reason — closed, nobody rostered for that service, or every slot taken — and one button that jumps to the next day that has something. Never a dead end. |
+| Nobody on duty | Separated from "everything is taken" by `staffWorks`, because they are different sentences. |
+| Slot taken while the form is open | Any store write redraws this page; the time that no longer exists is dropped, the grid is rebuilt and the reason is said out loud. The day is *not* moved under a half-filled form — the landing jump to the first bookable day runs once per visit, guarded by `draft.landed`. |
+| Missing or malformed number | Ten digits, optionally with `+91`, a leading `0`, spaces or dashes. Anything else gets "That mobile number does not look right." and the focus back. |
+
+Accessibility: each step is a `radiogroup` of real buttons with `aria-checked`, every input has
+a `<label for>`, the focus ring is the kit's, and `#pub-live` — a visually hidden `role="status"`
+region that lives in the shell rather than in the view — carries every refusal and the
+confirmation. It is deliberately outside `#pubhost`: a live region replaced by the very update
+it should announce announces nothing.
+
+Phone numbers are stored masked (`+91 ••••• 1234`), the same way every number in the seed is,
+so nothing a visitor types is kept in full. A repeat visitor with the same name and the same
+last four digits is matched to the existing customer instead of creating a second one.
+
+Leaving the page calls `resetBookingPage()`: the next person at that screen is a different
+person, so neither a half-filled form nor somebody else's confirmation survives.
 
 ## Topbar controls
 
@@ -409,10 +466,11 @@ inside the dialog, `Escape` and the close button and a scrim click all exit.
 
 The slip is `--amber-fill` with `--on-amber` text, and every quiet colour on it is an alpha of
 white rather than a theme token — which is why it looks the same in dark mode. White on
-`#B82D6E` is 5.77:1. The **Download** button names `#98215C` literally rather than
-`--amber-deep`, which is a light pink in the dark palette and would vanish on its white slab.
+`#0B7D74` is 5.00:1, and the quiet white on it is at 94% rather than 88%. The **Download**
+button names `#0A6156` literally rather than `--amber-deep`, which is a light cyan in the dark
+palette and would vanish on its white slab.
 
-`drawSlip(data)` paints the same content on an offscreen 1080 × 1350 canvas: solid rose
+`drawSlip(data)` paints the same content on an offscreen 1080 × 1350 canvas: solid teal
 ground, inset white rule, the desk name, the token at 232px mono, the reference, then the five
 detail rows, then the footer line. `document.fonts.ready` is awaited first so the canvas gets
 Inter and JetBrains Mono rather than a fallback, long values are trimmed with an ellipsis to
@@ -428,16 +486,16 @@ kept rather than the temporary one it was created with.
 
 `assets/app.css` ships the palette under `[data-theme="dark"]`: surfaces go dark, hairlines
 lift, the status colours brighten, and `--amber-fill` and `--on-amber` do not move at all. The
-rule that survives the theme is the same one that governs the light build — **the rose is a
+rule that survives the theme is the same one that governs the light build — **the teal is a
 fill and the text on it is white**.
 
-`assets/slotly.css` section 0 overrides the dark accent tokens too (`--amber-soft` `#2E1226`,
-`--amber-line` `#55223F`, `--amber-deep` `#FF8FBE` at 8.2:1 on the dark surface, `--amber-darker`
-`#FFB6D3`), or dark mode would still be yellow. The kit re-pins the whole *light* palette inside
+`assets/slotly.css` section 0 overrides the dark accent tokens too (`--amber-soft` `#0E2B28`,
+`--amber-line` `#20514A`, `--amber-deep` `#45D9D0` at 10.0:1 on the dark surface, `--amber-darker`
+`#85E8E0`), or dark mode would still be yellow. The kit re-pins the whole *light* palette inside
 `data-tone="amber"` in dark mode, because its yellow is a light surface the dark theme's ink
-would land on at 1.9:1; rose is a dark surface, so that reasoning inverts and section 7i undoes
+would land on at 1.9:1; teal is a dark surface, so that reasoning inverts and section 7i undoes
 all of it except the accent text pair, which is read on the white active pill and the white
-footer tiles and so has to stay the rose shades. The active nav row stays a solid white card. The switch knob, the calendar event
+footer tiles and so has to stay the teal shades. The active nav row stays a solid white card. The switch knob, the calendar event
 bars and the uptime-style strips get the same treatment.
 
 Checked screen by screen at 1280px and 390px in both themes: Today, Calendar, Bookings,
@@ -450,11 +508,11 @@ Three files, no build step and no dependency.
 
 | File | Job |
 |---|---|
-| `manifest.webmanifest` | `name`/`short_name` **Slotly**, one-line description, `start_url` and `scope` both `./` so it works from a Pages subdirectory, `display: standalone`, `background_color: #FFFFFF`, `theme_color: #B82D6E`, `lang: en`, categories, and three icons — 192 and 512 as `purpose: "any"`, plus a 512 as `purpose: "maskable"` for Android's shaped icons. |
+| `manifest.webmanifest` | `name`/`short_name` **Slotly**, one-line description, `start_url` and `scope` both `./` so it works from a Pages subdirectory, `display: standalone`, `background_color: #FFFFFF`, `theme_color: #0B7D74`, `lang: en`, categories, and three icons — 192 and 512 as `purpose: "any"`, plus a 512 as `purpose: "maskable"` for Android's shaped icons. |
 | `sw.js` | Cache-first service worker over one versioned cache keyed on the registration scope. `install` pre-caches `SHELL`, `activate` deletes every older cache under the same scope and claims open clients, `fetch` serves same-origin assets from cache and falls back to `./index.html` for navigations so a reload works offline. |
 | `lib/pwa.js` | Registers the worker on `load`, captures `beforeinstallprompt`, and drives the **Install app** control. |
 
-`index.html` carries `<link rel="manifest">`, `<meta name="theme-color" content="#B82D6E">`,
+`index.html` carries `<link rel="manifest">`, `<meta name="theme-color" content="#0B7D74">`,
 an `apple-touch-icon` and the `apple-mobile-web-app-*` pair that gives iOS a standalone window
 and the right home-screen name.
 
@@ -473,7 +531,7 @@ dismissed" note look like every other message in the app.
 
 **The `SHELL` array in `sw.js` is the one thing to maintain.** It lists this app's own files
 explicitly — `./`, `./index.html`, the manifest, both stylesheets, all three `lib` modules,
-all seventeen `src` modules and the three icons. `addAll` is atomic: one file that 404s fails the
+all eighteen `src` modules and the three icons. `addAll` is atomic: one file that 404s fails the
 whole install and the app is then not available offline, and one file left off the list is
 simply missing when there is no connection. Add or rename a file, update `SHELL` and bump
 `CACHE_VERSION` in the same commit.
@@ -504,12 +562,12 @@ Defined in `assets/app.css` under `:root`. Use the variable, never the literal.
 |---|---|---|
 | `--bg`, `--surface` | `#FFFFFF` | Page and card ground |
 | `--surface-2` | `#FAFAF8` | Table heads, muted cells, log ground |
-| `--hover` | `#FEF6FB` | Row and button hover (overridden in `slotly.css`) |
+| `--hover` | `#EFF9F7` | Row and button hover (overridden in `slotly.css`) |
 | `--ink`, `--ink-2`, `--muted`, `--faint` | `#17181A` → `#686E75` | Text ramp |
 | `--line`, `--line-2` | `#E7E7E4`, `#D8D8D3` | Hairlines |
-| `--amber`, `--amber-fill` | `#B82D6E` | The brand rose, **as a fill with white text** (`slotly.css` §0) |
-| `--amber-deep`, `--amber-darker` | `#98215C`, `#731648` | Rose *text* on white (7.76:1, 10.84:1) — never `--amber` for type |
-| `--amber-soft`, `--amber-line` | `#FAE6F4`, `#EEB9D8` | Selected and accent surfaces |
+| `--amber`, `--amber-fill` | `#0B7D74` | The brand teal, **as a fill with white text** (`slotly.css` §0) |
+| `--amber-deep`, `--amber-darker` | `#0A6156`, `#06463E` | Teal *text* on white (7.35:1, 10.75:1) — never `--amber` for type |
+| `--amber-soft`, `--amber-line` | `#D8F1ED`, `#93D2C9` | Selected and accent surfaces |
 | `--ok` `--warn` `--bad` `--info` | solid | Status, each paired with `-soft` and `-line` |
 | `--r-lg` `--r` `--r-sm` `--r-xs` | 12 / 8 / 6 / 4 px | Radii |
 | `--sans` | Inter | UI |

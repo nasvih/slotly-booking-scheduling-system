@@ -2,7 +2,7 @@
    slotly — the token slip.
    Shown the moment a booking is made, from the calendar, the booking
    dialog or the desk agent, and again on demand from any booking row.
-   Plain rose ground, white type, the token large enough to read
+   Plain teal ground, white type, the token large enough to read
    across a counter. The download is drawn here on a canvas and saved
    as a PNG — no library, no network, nothing leaves the browser.
    ============================================================ */
@@ -17,7 +17,7 @@ const DOWN_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9M6
 
 /* The slip's two colours, matching --amber-fill and --on-amber in the CSS.
    The fill is a dark ground, so what is drawn on it is white, not ink. */
-const SLIP_BG = '#B82D6E';
+const SLIP_BG = '#0B7D74';
 const SLIP_FG = '#FFFFFF';
 
 /** Everything the slip prints, read once so the popup and the PNG agree. */
@@ -41,7 +41,7 @@ function slipData(state, b) {
 /* ---------- the PNG ---------- */
 /**
  * Draws the slip at 1080×1350 — big enough to keep on a phone or print, small
- * enough to save instantly. Solid fills only, same rose and same white as the
+ * enough to save instantly. Solid fills only, same teal and same white as the
  * popup on screen.
  */
 function drawSlip(data) {

@@ -43,6 +43,11 @@ same day, a week calendar shows every staff member side by side, and each servic
 own duration and buffer so the diary reflects how long the work actually takes. Every booking
 has a confirmation message written from a template.
 
+It has two faces. The app opens on the **booking page** — the calm single column a customer
+lands on when they want an appointment. Behind it is the **staff desk**: the queue, the week
+calendar, the records, the rotas and the settings. They share one store, so a booking taken
+on the front page blocks the slot on the calendar and joins the Today queue as it is made.
+
 ## Where it helps a business
 
 - The diary stops being a paper book that only one person can read.
@@ -86,6 +91,7 @@ The same blocks are in the app, behind the **About this demo** button in the top
 
 | Screen | What it does |
 |---|---|
+| **Book an appointment** | The page the app opens on, and the one a customer sees. Pick a service, a day, a time and — if more than one person is free — who you see; leave a name and a number; confirm. It ends with the same token slip every booking gets. One column, no sidebar, no jargon, phone first. A quiet **Staff desk** control in its bar opens the seven screens below, and **Booking page** at the head of the sidebar footer comes back. No login: the demo would only be pretending. |
 | **Today** | The live token queue for the current day. Call next, call, start serving, mark done, mark no-show, undo. Stats for queue length, served, no-shows, chair time booked, plus a per-staff load bar. Filter by waiting / served / no-show / cancelled. |
 | **Calendar** | Week grid, time down the side, seven days across, all three staff resources on one sheet. Pick a service and a staff filter; free cells show `+ N free` and open the booking dialog on click. Past slots, closed days and off-shift hours are locked. |
 | **Bookings** | Every record. Range (upcoming / past / all), status, service and staff filters, text search, CSV export. Row detail drawer with the confirmation message that went out, an editable desk note and the change history. Reschedule keeps the reference and re-issues the token; cancel asks for confirmation and releases the slot. |
@@ -96,8 +102,8 @@ The same blocks are in the app, behind the **About this demo** button in the top
 
 ### The token slip
 
-Every booking — from the calendar, from the booking dialog or from the assistant — ends with a
-plain rose slip in white type: the token in large mono, the `SL-…` reference under it, then
+Every booking — from the booking page, the calendar, the booking dialog or the assistant — ends with a
+plain teal slip in white type: the token in large mono, the `SL-…` reference under it, then
 customer, service, staff, date and time. **Download** draws the same slip on a `<canvas>` at
 1080 × 1350 and saves it as a PNG the visitor can keep; a line on the popup says a screenshot
 works too. It is never a one-time thing — every booking row on **Today** and in **Bookings**
@@ -109,11 +115,11 @@ has a **Token** button that shows it again, and so does the row detail drawer.
 |---|---|
 | **About this demo** | The modal: what this is, where it helps, what the assistant can change (with a worked example each), how the demo works, and where to read the source. |
 | **Notifications** | A bell with an unread count. The list is worked out from the live bookings every time it opens: anything starting within the hour, today's no-shows, cancellations in the week ahead, and anyone running over or booked past their hours. Mark one or all read; the read marks persist under `slotly.notify`. Empty state when the desk is clear. |
-| **Device preview** | Phone and desktop icons. Phone mode drops the whole app into a 390 × 844 `<iframe>` inside a rounded bezel on a rose surround, so the real breakpoints fire for the real reason. The framed copy carries `?frame=1` and hides the control, so there is no preview inside the preview. |
-| **Dark mode** | Sets `data-theme="dark"` on `<html>` and persists it under `slotly.theme`. On a first visit it follows `prefers-color-scheme`, and keeps following the system until you press the switch. The rose stays a fill with white text in both themes. |
+| **Device preview** | Phone and desktop icons. Phone mode drops the whole app into a 390 × 844 `<iframe>` inside a rounded bezel on a teal surround, so the real breakpoints fire for the real reason. The framed copy carries `?frame=1` and hides the control, so there is no preview inside the preview. |
+| **Dark mode** | Sets `data-theme="dark"` on `<html>` and persists it under `slotly.theme`. On a first visit it follows `prefers-color-scheme`, and keeps following the system until you press the switch. The teal stays a fill with white text in both themes. |
 
-The sidebar is the brand rose by default, with white text on it. Two icon-only controls sit on
-the brand row at the top, right of the name: a circle half filled switches between rose and
+The sidebar is the brand teal by default, with white text on it. Two icon-only controls sit on
+the brand row at the top, right of the name: a circle half filled switches between teal and
 plain white (labelled *Sidebar colour* — it names no colour, and `aria-pressed` carries the
 tone), and a panel with a chevron collapses the sidebar to a 64px icon rail. Both choices
 persist under their own `slotly.ui` key, separate from the demo data. The footer below holds
@@ -121,7 +127,7 @@ nasvih.in beside **GitHub**, then **Reset demo data** — joined by an **Install
 where the browser offers one. The assistant has a single entry point: the round launcher at
 the bottom right, or `⌘K` / `Ctrl+K`.
 
-Flows that persist through `localStorage`: **booking** (calendar, dialog or assistant → blocks
+Flows that persist through `localStorage`: **booking** (booking page, calendar, dialog or assistant → blocks
 the slot → appears in Today), **queue state changes** (call / serve / done / no-show / undo),
 **setup edits** (service prices and toggles, staff rotas, message templates, desk notes),
 **held staff time** (written by the assistant, released from the staff card) and the interface
@@ -176,15 +182,16 @@ the repository.
 | Path | Purpose |
 |---|---|
 | `index.html` | The single page. Fonts, stylesheets, manifest link, `<noscript>` line, module entry. |
-| `manifest.webmanifest` | Web app manifest: name, icons, `standalone` display, `#B82D6E` theme colour. |
+| `manifest.webmanifest` | Web app manifest: name, icons, `standalone` display, `#0B7D74` theme colour. |
 | `sw.js` | Service worker. Caches the shell listed in `SHELL` so the app opens offline. |
 | `assets/app.css` | Shared product design system: tokens, shell, buttons, tables, forms, modal, assistant. Unmodified — the accent tokens are overridden in `slotly.css`, never here. |
-| `assets/slotly.css` | The rose accent override (section 0) plus app-specific components — queue rows, calendar grid, slot picker, staff cards, template preview, sidebar footer. |
+| `assets/slotly.css` | The teal accent override (section 0) plus app-specific components — queue rows, calendar grid, slot picker, staff cards, template preview, sidebar footer. |
 | `assets/icons/` | Install icons: 192, 512 and a 512 maskable. |
 | `lib/ui.js` | DOM helpers, formatting, seeded random, `createStore`, hash router, toast, modal, confirm, CSV, bar chart, meter, icons. |
 | `lib/assistant.js` | The assistant engine: intent routing, word-by-word streaming, panel and launcher. |
 | `lib/pwa.js` | Service worker registration and the install control. |
-| `src/main.js` | Boot: store, shell, nav, router, keyboard shortcuts, about modal, topbar controls, assistant mount, install control. |
+| `src/main.js` | Boot: store, both shells, nav, router, keyboard shortcuts, about modal, topbar controls, assistant mount, install control. |
+| `src/views/book.js` | The customer's booking page — the default route. Reuses the desk's own availability and booking functions. |
 | `src/data.js` | Seeded dataset and every scheduling calculation — availability, utilisation, no-show rates, held time, templates. |
 | `src/agent.js` | The twelve reading *Slotly Desk* intents, each computed from live store state. |
 | `src/actions.js` | The seven acting intents: book, reschedule, cancel, run the queue, hold staff time, change a service, and "what can you do?". |

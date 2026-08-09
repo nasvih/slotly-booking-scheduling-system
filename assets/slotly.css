@@ -1,14 +1,15 @@
 /* ============================================================
    slotly — app-specific components.
    Loaded after app.css. Uses the tokens defined there, and overrides
-   the accent ones (section 0) to slotly's own rose.
+   the accent ones (section 0) to slotly's own teal.
    Solid fills only: no gradients, no blur, no glow.
    0 accent · 1 layout bits · 2 queue · 3 calendar · 4 slot picker
-   5 staff + hours · 6 templates · 7 drawer detail · 8 responsive
+   5 staff + hours · 6 templates · 7 drawer detail · 8 booking page
+   9 responsive
    ============================================================ */
 
 /* == 0. accent ==
-   slotly is rose, not the kit's yellow. The token NAMES stay --amber-* so
+   slotly is teal, not the kit's yellow. The token NAMES stay --amber-* so
    nothing else in the app or the kit has to change; only the values move.
    The structure is the kit's, unchanged: --amber-fill is the FILL, the two
    --deep/--darker shades are the readable text-on-white pair, --soft/--line
@@ -16,37 +17,46 @@
    the fill.
 
    The one thing that does change is the polarity. #EAC81C is a light ground
-   that carries ink; #B82D6E is a dark ground that carries white, so every
+   that carries ink; #0B7D74 is a dark ground that carries white, so every
    place the kit paired ink with the fill is flipped below and in 7b/7e/7f.
 
    Contrast, measured not guessed (WCAG 2.1 relative luminance):
-     #FFFFFF on #B82D6E ............ 5.77:1   (text on the fill)
-     rgba(255,255,255,.88) on fill .. 4.80:1   (quiet text on the fill)
-     #98215C on #FFFFFF ............ 7.76:1   (--amber-deep, text on white)
-     #98215C on #FAE6F4 ............ 6.53:1   (--amber-deep on the tint)
-     #731648 on #FFFFFF ............ 10.84:1  (--amber-darker)
-     #FFFFFF on #A02460 ............ 7.20:1   (the hover fill)
-     fill vs #FFFFFF page .......... 5.77:1   (the fill's own edge, light)
-     fill vs #191A1D surface ....... 3.01:1   (the fill's own edge, dark)
+     #FFFFFF on #0B7D74 ............ 5.00:1   (text on the fill)
+     rgba(255,255,255,.94) on fill .. 4.61:1   (quiet text on the fill)
+     #0A6156 on #FFFFFF ............ 7.35:1   (--amber-deep, text on white)
+     #0A6156 on #D8F1ED ............ 6.20:1   (--amber-deep on the tint)
+     #06463E on #FFFFFF ............ 10.75:1  (--amber-darker)
+     #FFFFFF on #096A63 ............ 6.45:1   (the hover fill)
+     fill vs #FFFFFF page .......... 5.00:1   (the fill's own edge, light)
+     fill vs #191A1D surface ....... 3.48:1   (the fill's own edge, dark)
    Dark theme:
-     #FF8FBE on #191A1D ............ 8.22:1   (--amber-deep)
-     #FF8FBE on #2E1226 ............ 8.06:1   (--amber-deep on the tint)
-     #FFB6D3 on #191A1D ............ 10.67:1  (--amber-darker)
+     #45D9D0 on #191A1D ............ 10.02:1  (--amber-deep)
+     #45D9D0 on #0E2B28 ............ 8.67:1   (--amber-deep on the tint)
+     #85E8E0 on #191A1D ............ 12.11:1  (--amber-darker)
 
-   The hue sits at 332°, well clear of --bad (#B3261E, 8°), so a selected
-   slot and a cancelled booking never read as the same colour. */
+   Quiet text on the fill was white at 88% when the accent was rose (4.80:1);
+   teal is a lighter ground than that rose, so 88% falls to 4.24:1 and every
+   one of those rules moves to 94% below. Hairlines and hovers keep their old
+   alphas — they carry no type and only owe 3:1.
+
+   The hue sits at 175°, clear of --bad (#B3261E, 8°) and of --info (211°).
+   It is 26° off --ok (#1E7A4B, 149°), which is the one neighbour close enough
+   to matter: a "done" pill and a selected slot are told apart by lightness
+   rather than hue — the pill is a pale tint with dark green type, the slot is
+   the solid fill with white on it — and section 3 pulls the calendar's staff
+   bars apart for the same reason. */
 :root{
-  --amber:#B82D6E;       --amber-deep:#98215C;   --amber-darker:#731648;
-  --amber-fill:#B82D6E;  --amber-fill-hi:#A02460;
-  --amber-soft:#FAE6F4;  --amber-line:#EEB9D8;   --on-amber:#FFFFFF;
+  --amber:#0B7D74;       --amber-deep:#0A6156;   --amber-darker:#06463E;
+  --amber-fill:#0B7D74;  --amber-fill-hi:#096A63;
+  --amber-soft:#D8F1ED;  --amber-line:#93D2C9;   --on-amber:#FFFFFF;
   /* the kit's hover tint is the accent at its faintest, so it moves too */
-  --hover:#FEF6FB;
+  --hover:#EFF9F7;
 }
 [data-theme="dark"]{
-  --amber-soft:#2E1226;  --amber-line:#55223F;   --amber-deep:#FF8FBE;  --amber-darker:#FFB6D3;
-  --hover:#2A1626;
+  --amber-soft:#0E2B28;  --amber-line:#20514A;   --amber-deep:#45D9D0;  --amber-darker:#85E8E0;
+  --hover:#16302C;
 }
-/* the kit sets ink on the fill here because yellow is light; rose is not */
+/* the kit sets ink on the fill here because yellow is light; teal is not */
 ::selection{background:var(--amber-fill);color:#FFFFFF}
 
 /* == 1. layout bits == */
@@ -109,9 +119,16 @@ button.pill:hover{border-color:var(--amber)}
 .cal__shut{font-family:var(--mono);font-size:10px;color:var(--faint)}
 .cal__ev{border:1px solid var(--line-2);border-left:3px solid var(--night);border-radius:var(--r-xs);background:var(--surface-2);padding:3px 6px;font-size:11px;line-height:1.35;overflow:hidden}
 .cal__ev b{display:block;font-family:var(--mono);font-size:10px;font-weight:600;color:var(--faint)}
+/* Three staff, three hues that have to survive being 3px wide. The accent was
+   rose when the third bar took --amber-deep, 183° off --ok; teal lands 26°
+   away from it, and two dark green-blue hairlines side by side are one bar.
+   The third bar moves to --warn instead. Held time is --warn too, but that
+   event is dashed, tinted and labelled "Held", so the pair never reads as the
+   same thing. Every bar also prints its owner's initials — colour is a second
+   signal here, never the only one. */
 .cal__ev--st-rehana{border-left-color:var(--info)}
 .cal__ev--st-anwar{border-left-color:var(--ok)}
-.cal__ev--st-nithya{border-left-color:var(--amber-deep)}
+.cal__ev--st-nithya{border-left-color:var(--warn)}
 .cal__ev--off{opacity:.55;border-left-color:var(--line-2)}
 /* time held back for a staff member: not a booking, but the slot is gone */
 .cal__ev--held{border-style:dashed;border-left:3px solid var(--warn);background:var(--warn-soft);color:var(--warn)}
@@ -177,15 +194,15 @@ button.pill:hover{border-color:var(--amber)}
    modal wider than the 390px viewport */
 .aboutlink{font-size:11.5px;overflow-wrap:anywhere}
 
-/* == 7b. the rose sidebar ==
+/* == 7b. the teal sidebar ==
    The kit's tone mode was drawn for a light yellow fill carrying ink text.
-   Rose is a dark ground, so the polarity of the whole subtree flips: white
+   Teal is a dark ground, so the polarity of the whole subtree flips: white
    type, white hairlines, white-tinted hovers. Everything below restates a
    rule app.css writes with ink in it — same selectors, same structure, only
    the side of the fill the colour comes from.
 
-   White on #B82D6E is 5.77:1 and the quiet text (white at 88%) is 4.80:1.
-   The active row and every control keep a white ground with ink or rose type
+   White on #0B7D74 is 5.00:1 and the quiet text (white at 94%) is 4.61:1.
+   The active row and every control keep a white ground with ink or teal type
    on them, which is the same move the yellow sidebar made — a white pill on
    the fill — and it survives the flip unchanged. These rules carry no theme
    selector because the fill is the same colour in both themes. */
@@ -193,31 +210,32 @@ button.pill:hover{border-color:var(--amber)}
 .side[data-tone="amber"] .side__brand,
 .side[data-tone="amber"] .side__foot,
 .side[data-tone="amber"] .navgroup+.navgroup{border-color:rgba(255,255,255,.24)}
-/* the brand square inverts: a white tile with the rose glyph, because ink on
-   rose is only 2.9:1 and a 12px mono letter cannot live there */
+/* the brand square inverts: a white tile with the teal glyph, because ink on
+   teal is only 3.4:1 and a 12px mono letter cannot live there */
 .side[data-tone="amber"] .mark{background:#FFFFFF;color:var(--amber-deep)}
 .side[data-tone="amber"] .side__name{color:#FFFFFF}
 .side[data-tone="amber"] .navlink{color:#FFFFFF}
+/* the glyph is not type and owes 3:1, so it keeps the lighter alpha */
 .side[data-tone="amber"] .navlink svg{color:rgba(255,255,255,.88)}
-/* quiet text on the fill: white at 88% (4.80:1). --amber-darker was the
-   yellow sidebar's answer here and it is a dark shade — unusable on rose. */
+/* quiet text on the fill: white at 94% (4.61:1). --amber-darker was the
+   yellow sidebar's answer here and it is a dark shade — unusable on teal. */
 .side[data-tone="amber"] .side__tag,
 .side[data-tone="amber"] .navgroup__label,
 .side[data-tone="amber"] .navlink__count,
-.side[data-tone="amber"] .side__sub{color:rgba(255,255,255,.88)}
+.side[data-tone="amber"] .side__sub{color:rgba(255,255,255,.94)}
 .side[data-tone="amber"] .side__sub .linkish{border-bottom-color:rgba(255,255,255,.6)}
 .side[data-tone="amber"] .navlink:hover{background:rgba(255,255,255,.14)}
 .side[data-tone="amber"] .navlink.is-active{background:#FFFFFF;color:#17181A}
 .side[data-tone="amber"] .navlink.is-active svg{color:var(--amber-deep)}
-/* the active row is a white pill on rose; a hover tint over it only muddies
+/* the active row is a white pill on teal; a hover tint over it only muddies
    the state */
 .side[data-tone="amber"] .navlink.is-active:hover{background:#FFFFFF}
-/* the kit rings focus with --ink here because ink reads on yellow; on rose
+/* the kit rings focus with --ink here because ink reads on yellow; on teal
    the ring has to be the white one */
 .side[data-tone="amber"] :focus-visible{outline-color:#FFFFFF}
 
 /* == 7b2. sidebar footer: links + install ==
-   Everything in the footer is read against #B82D6E first and against white
+   Everything in the footer is read against #0B7D74 first and against white
    second: the controls are white grounds with ink on them, and the one dark
    link keeps its inverted ground. */
 
@@ -229,7 +247,7 @@ button.pill:hover{border-color:var(--amber)}
 .side__pair .navlink:not(.sitelink){border:1px solid var(--line-2)}
 .side__pair .navlink:not(.sitelink):hover{background:var(--hover);border-color:var(--amber-line)}
 /* on the fill the controls stand as near-white tiles with ink type: white at
-   92% over rose is 13.9:1 for ink, and the tile itself is 5.2:1 off the fill */
+   92% over teal is 16.0:1 for ink, and the tile itself is 4.5:1 off the fill */
 .side[data-tone="amber"] .btn,
 .side[data-tone="amber"] .side__brandbtns .btn,
 .side[data-tone="amber"] .side__pair .navlink:not(.sitelink){background:rgba(255,255,255,.92);border-color:rgba(23,24,26,.2);color:#17181A}
@@ -244,7 +262,7 @@ button.pill:hover{border-color:var(--amber)}
 .side__pair .navlink span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* the one dark element in the sidebar. Ink ground, white type — 16:1 either way,
-   and it reads as deliberate against the rose rather than as a hole in it. */
+   and it reads as deliberate against the teal rather than as a hole in it. */
 .sitelink{background:var(--night);color:#FFFFFF}
 .sitelink svg{color:#FFFFFF}
 .sitelink:hover{background:var(--night-2);color:#FFFFFF}
@@ -295,8 +313,8 @@ button.pill:hover{border-color:var(--amber)}
 .notepanel__foot{padding:10px 14px;border-top:1px solid var(--line);line-height:1.5}
 
 /* == 7e. the token slip ==
-   Plain rose ground, white type, nothing else on it. White on #B82D6E is
-   5.77:1, so every colour here is fixed against the fill rather than against
+   Plain teal ground, white type, nothing else on it. White on #0B7D74 is
+   5.00:1, so every colour here is fixed against the fill rather than against
    the page — which is why it reads the same in dark mode.
    The scrim scrolls, so the slip is centred with auto margins rather than with
    place-items: centring a grid item taller than its scroll container puts its
@@ -309,34 +327,35 @@ button.pill:hover{border-color:var(--amber)}
 .tokenpop__x{width:30px;height:30px;flex:none;border-radius:var(--r-sm);border:1px solid rgba(255,255,255,.55);background:transparent;color:var(--on-amber);display:grid;place-items:center;cursor:pointer;padding:0}
 .tokenpop__x svg{width:16px;height:16px}
 .tokenpop__x:hover{background:rgba(255,255,255,.14)}
-.tokenpop__label{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-top:14px;color:rgba(255,255,255,.88)}
+.tokenpop__label{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-top:14px;color:rgba(255,255,255,.94)}
 .tokenpop__num{font-family:var(--mono);font-size:clamp(58px,17vw,86px);font-weight:700;line-height:1.02;letter-spacing:-.03em;margin-top:4px}
 .tokenpop__ref{font-family:var(--mono);font-size:14px;font-weight:600;letter-spacing:.1em;margin-top:4px}
 .tokenpop__kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;text-align:left;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.35)}
-.tokenpop__kv dt{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.88);padding-top:2px}
+.tokenpop__kv dt{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.94);padding-top:2px}
 .tokenpop__kv dd{font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
-.tokenpop__note{text-align:left;font-size:12px;line-height:1.5;margin-top:14px;color:rgba(255,255,255,.9)}
+.tokenpop__note{text-align:left;font-size:12px;line-height:1.5;margin-top:14px;color:rgba(255,255,255,.94)}
 .tokenpop__foot{display:flex;gap:8px;margin-top:16px}
 .tokenpop__foot .btn{flex:1}
-/* the primary is the solid one: a white slab with rose type (7.8:1); the
-   secondary is an outline: white type straight on the fill (5.77:1), and
-   its hover tint stops at 14% so the type is still 4.57:1 */
+/* the primary is the solid one: a white slab with teal type (7.35:1, and
+   6.20:1 on its hover tint); the secondary is an outline: white type straight
+   on the fill (5.00:1), and its hover tint stops at 14% so the type still
+   clears AA */
 /* literal shades, not --amber-deep: the slip is fixed against the fill, and
-   --amber-deep is a light pink in the dark palette that would vanish here */
-.tokenpop__dl{background:#FFFFFF;border-color:#FFFFFF;color:#98215C}
-.tokenpop__dl:hover{background:#FAE6F4;border-color:#FAE6F4;color:#98215C}
-.tokenpop__dl svg{color:#98215C}
+   --amber-deep is a light cyan in the dark palette that would vanish here */
+.tokenpop__dl{background:#FFFFFF;border-color:#FFFFFF;color:#0A6156}
+.tokenpop__dl:hover{background:#D8F1ED;border-color:#D8F1ED;color:#0A6156}
+.tokenpop__dl svg{color:#0A6156}
 .tokenpop__done{background:transparent;border-color:rgba(255,255,255,.55);color:var(--on-amber)}
 .tokenpop__done:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.8)}
 .tokenpop :focus-visible{outline-color:var(--on-amber)}
 
 /* == 7f. device preview ==
    A real iframe at 390×844 inside a bezel, so the app's own breakpoints fire
-   for the honest reason. Rose surround, white text — the usual pairing. */
+   for the honest reason. Teal surround, white text — the usual pairing. */
 .devstage{position:fixed;inset:0;z-index:90;background:var(--amber-fill);color:var(--on-amber);display:flex;flex-direction:column;align-items:center;padding:16px 16px 0;overflow:hidden}
 .devstage__head{width:100%;max-width:560px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
 .devstage__name{font-size:18px;font-weight:700;letter-spacing:-.02em}
-.devstage__sub{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.88);margin-top:2px}
+.devstage__sub{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.94);margin-top:2px}
 .devstage__body{flex:1;width:100%;display:flex;justify-content:center;align-items:flex-start;min-height:0}
 .devbezel{width:414px;height:868px;flex:none;padding:12px;border-radius:46px;background:#17181A;box-shadow:var(--shadow-3);transform-origin:top center}
 .devframe{width:390px;height:844px;border:0;border-radius:34px;background:var(--bg);display:block}
@@ -361,17 +380,17 @@ button.pill:hover{border-color:var(--amber)}
 
    The kit re-pins the whole light palette inside the tone sidebar in dark
    mode, because #EAC81C is a light surface that the dark theme's near-white
-   ink would land on at 1.9:1. #B82D6E is a dark surface, so that reasoning
-   inverts: the rose sidebar wants the same white type it has in light mode,
+   ink would land on at 1.9:1. #0B7D74 is a dark surface, so that reasoning
+   inverts: the teal sidebar wants the same white type it has in light mode,
    which the theme-free rules in 7b already give it. All that is left to undo
    is the accent pair the kit re-pinned to its yellow shades — they are read
    on the white active pill and the white footer tiles, so they have to be
-   the rose text shades, not the yellow ones. */
+   the teal text shades, not the yellow ones. */
 [data-theme="dark"] .side[data-tone="amber"]{
-  --amber-deep:#98215C; --amber-darker:#731648;
+  --amber-deep:#0A6156; --amber-darker:#06463E;
   border-right-color:var(--amber-fill-hi);
 }
-/* the inverted link needs a ground that still reads as deliberate on rose */
+/* the inverted link needs a ground that still reads as deliberate on teal */
 [data-theme="dark"] .sitelink{background:#101113}
 /* switch knob: the unchecked one sits on a dark track, the checked one is a
    white dot on the rose fill */
@@ -382,7 +401,167 @@ button.pill:hover{border-color:var(--amber)}
 [data-theme="dark"] .cal__ev{background:var(--surface)}
 [data-theme="dark"] .stripe i{background:var(--line-2)}
 
-/* == 8. responsive == */
+/* == 8. the booking page ==
+   The customer's side of the same product. Same tokens, same type scale, same
+   radii and hairlines as the desk — and none of its density: no sidebar, no
+   table, no counts, one column that is never wider than a comfortable line.
+   Written phone-first, because that is where a clinic gets booked from: every
+   control here is at least 44px tall before any media query touches it.
+
+   The desk's chrome is hidden rather than unmounted while this page is up, so
+   the two shells never fight over the same fixed corner. */
+body.is-public .assist-fab,
+body.is-public .assist{display:none}
+
+.pubshell{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;background:var(--bg)}
+.pubbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;
+  min-height:var(--bar);padding:8px 16px;padding-top:calc(8px + env(safe-area-inset-top));
+  background:var(--surface);border-bottom:1px solid var(--line)}
+.pubbar__brand{display:flex;align-items:center;gap:10px;min-width:0}
+.pubbar__id{min-width:0}
+.pubbar__name{font-weight:700;letter-spacing:-.02em;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pubbar__tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* the way into the desk: an outline control, not a primary one — booking is
+   the only thing this page is asking anybody to do */
+.pubbar__staff{flex:none;min-height:40px}
+/* the kit sizes an icon button for a mouse (34px) and only lifts it under
+   900px; this page is thumbed at every width, so its two controls are 40px
+   from 320 to 1920 */
+/* flex:none as well: at 320 the row is full and a shrinking square lands at
+   39.97px, which is under the size the rest of the page holds to */
+.pubbar .btn--icon{width:40px;height:40px;padding:7px;flex:none}
+.pubmain{flex:1}
+.pubfoot{border-top:1px solid var(--line);background:var(--surface-2);
+  padding:20px 16px calc(24px + env(safe-area-inset-bottom))}
+.pubfoot p{max-width:640px;margin:0 auto;line-height:1.6}
+.pubfoot__acts{max-width:640px;margin:12px auto 0;display:flex;gap:8px;flex-wrap:wrap}
+.pubfoot__acts .btn{min-height:44px}
+
+/* the permanent live region: read out, never drawn */
+.pub__sr{position:absolute;width:1px;height:1px;padding:0;margin:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+
+.pub__col{max-width:640px;margin:0 auto;padding:24px 16px 48px}
+.pub__intro{margin-bottom:28px}
+.pub__intro h1{font-size:26px}
+.pub__lede{color:var(--muted);margin-top:8px;line-height:1.6}
+/* Each question is a heading, not a legend inside a box: the page is a list of
+   five plain questions and nothing else. */
+.pub__q{display:flex;align-items:baseline;gap:8px;font-size:16px;margin:28px 0 10px}
+.pub__opt{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+
+/* --- service --- */
+.pub__opts{display:flex;flex-direction:column;gap:8px}
+.pubopt{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;text-align:left;
+  border:1px solid var(--line-2);border-radius:var(--r);background:var(--surface);
+  padding:12px 14px;cursor:pointer;color:inherit;font:inherit}
+.pubopt:hover{border-color:var(--amber);background:var(--hover)}
+.pubopt__main{flex:1;min-width:0}
+.pubopt__name{display:block;font-weight:600;font-size:14.5px}
+.pubopt__meta{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.pubopt__price{flex:none;font-size:14px;font-weight:600}
+.pubopt.is-on{background:var(--amber-fill);border-color:var(--amber-fill);color:var(--on-amber)}
+.pubopt.is-on .pubopt__meta{color:rgba(255,255,255,.94)}
+.pubopt.is-on:hover{background:var(--amber-fill-hi);border-color:var(--amber-fill-hi)}
+
+/* --- day --- */
+.pub__days{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px}
+.pubday{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  min-height:72px;border:1px solid var(--line-2);border-radius:var(--r);background:var(--surface);
+  cursor:pointer;color:inherit;font:inherit;padding:8px 4px}
+.pubday:hover{border-color:var(--amber);background:var(--hover)}
+.pubday__dow{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.pubday__n{font-family:var(--mono);font-size:19px;font-weight:600;line-height:1.1}
+.pubday__free{font-size:10.5px;color:var(--muted)}
+.pubday.is-on{background:var(--amber-fill);border-color:var(--amber-fill);color:var(--on-amber)}
+.pubday.is-on .pubday__dow,.pubday.is-on .pubday__free{color:rgba(255,255,255,.94)}
+/* a closed or full day is still on the strip, because "why can I not pick
+   Sunday" is a worse question than a greyed square that says Closed */
+.pubday.is-off{background:var(--surface-2);color:var(--faint);cursor:not-allowed;opacity:.75}
+.pubday.is-off:hover{border-color:var(--line-2);background:var(--surface-2)}
+/* The day already chosen can fall out from under the reader when the desk
+   takes the last slot on it. It keeps the selected hairline so the choice is
+   still visible, but the type goes back to ink: the white-on-fill pair above
+   would be white on a pale grey square, which is nothing at all. */
+.pubday.is-on.is-off{border-color:var(--amber-line);color:var(--faint)}
+.pubday.is-on.is-off .pubday__dow,
+.pubday.is-on.is-off .pubday__free{color:var(--faint)}
+
+/* --- time --- */
+.pub__times{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.pubtime{min-height:48px;border:1px solid var(--line-2);border-radius:var(--r);background:var(--surface);
+  font-family:var(--mono);font-size:13px;font-weight:600;cursor:pointer;color:inherit;padding:8px 4px}
+.pubtime:hover{border-color:var(--amber);background:var(--hover);color:var(--amber-deep)}
+.pubtime.is-on{background:var(--amber-fill);border-color:var(--amber-fill);color:var(--on-amber)}
+.pubtime.is-on:hover{background:var(--amber-fill-hi);border-color:var(--amber-fill-hi);color:var(--on-amber)}
+
+/* --- who --- */
+.pub__who{display:flex;flex-wrap:wrap;gap:8px}
+.pubwho{flex:1 1 160px;min-height:52px;text-align:left;border:1px solid var(--line-2);border-radius:var(--r);
+  background:var(--surface);padding:9px 12px;cursor:pointer;color:inherit;font:inherit}
+.pubwho:hover{border-color:var(--amber);background:var(--hover)}
+.pubwho__n{display:block;font-weight:600;font-size:13.5px}
+.pubwho__r{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.pubwho.is-on{background:var(--amber-fill);border-color:var(--amber-fill);color:var(--on-amber)}
+.pubwho.is-on .pubwho__r{color:rgba(255,255,255,.94)}
+
+/* --- states --- */
+.pub__notice{border:1px solid var(--amber-line);background:var(--amber-soft);border-radius:var(--r);
+  padding:11px 14px;font-size:13px;color:var(--ink-2);margin-bottom:12px;line-height:1.5}
+.pub__empty{padding:24px 18px}
+.pub__emptyact{margin-top:14px}
+.pub__emptyact .btn{min-height:44px}
+
+/* --- details + confirm --- */
+.pub__form{margin-top:4px}
+.pub__fields{display:flex;flex-direction:column;gap:16px}
+.pub__fields .field+.field{margin-top:0}
+.pub__form .input{min-height:46px}
+.pub__sum{margin-top:20px;font-size:13.5px;color:var(--muted);line-height:1.55}
+/* The live region is in the page from the first paint and empty until it has
+   something to say, so a later change to it is a change assistive tech reports
+   rather than a node appearing from nowhere. */
+.pub__live{margin-top:12px;font-size:13.5px;line-height:1.55;color:var(--ink-2)}
+.pub__live.is-on{border:1px solid var(--line-2);border-radius:var(--r);padding:10px 12px;background:var(--surface-2)}
+.pub__live.is-bad{border-color:var(--bad-line);background:var(--bad-soft);color:var(--bad)}
+.pub__go{width:100%;min-height:50px;margin-top:16px;font-size:15px}
+
+/* --- after it is booked --- */
+.pubdone{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);padding:24px 20px;text-align:center}
+.pubdone__tick{width:44px;height:44px;margin:0 auto 14px;border-radius:50%;
+  background:var(--ok-soft);border:1px solid var(--ok-line);color:var(--ok);display:grid;place-items:center}
+.pubdone__tick svg{width:22px;height:22px;stroke-width:2}
+.pubdone__h{font-size:24px}
+.pubdone__sub{color:var(--muted);margin-top:8px;line-height:1.6}
+/* The token is repeated here as a tint rather than the solid fill: the slip
+   over it is the solid one, and two of those on screen at once is one too
+   many. */
+.pubdone__tok{margin-top:20px;border:1px solid var(--amber-line);background:var(--amber-soft);border-radius:var(--r);padding:14px}
+.pubdone__toklabel{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-deep)}
+.pubdone__tokn{font-size:44px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:2px;color:var(--amber-darker)}
+.pubdone__ref{font-size:12.5px;font-weight:600;letter-spacing:.1em;color:var(--amber-deep)}
+.pubdone__kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px 16px;text-align:left;
+  margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}
+.pubdone__kv dt{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding-top:3px}
+.pubdone__kv dd{font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
+.pubdone__acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:22px}
+.pubdone__acts .btn{flex:1 1 140px;min-height:46px}
+
+/* == 9. responsive == */
+@media (max-width:480px){
+  /* Under 480px the bar is the desk's name, the theme switch and the way into
+     the desk, and the name is what matters. The staff control drops to its
+     glyph — the same move the desk's topbar makes with "New booking" — which
+     buys the name back about 70px and stops it truncating at 320. */
+  .pubbar__staff span{display:none}
+  .pubbar__staff{width:40px;height:40px;padding:0;justify-content:center}
+}
+@media (min-width:641px){
+  .pub__col{padding:36px 24px 64px}
+  .pub__intro h1{font-size:30px}
+  .pubbar{padding:8px 24px;padding-top:calc(8px + env(safe-area-inset-top))}
+  .pubfoot{padding:24px}
+  .pub__go{width:auto;min-width:240px}
+}
 @media (max-width:1080px){
   .tplgrid{grid-template-columns:minmax(0,1fr)}
 }

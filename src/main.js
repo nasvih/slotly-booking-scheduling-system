@@ -11,6 +11,7 @@ import { ACTION_EXAMPLES } from './actions.js';
 import { mountBell } from './notify.js';
 import { themeToggle, deviceControls, applyTheme, readTheme, IS_FRAMED } from './chrome.js';
 
+import renderBook, { resetBookingPage } from './views/book.js';
 import renderToday from './views/today.js';
 import renderCalendar from './views/calendar.js';
 import renderBookings from './views/bookings.js';
@@ -27,6 +28,12 @@ const store = createStore(STORE_KEY, seedState);
 /* A state saved by an earlier build has no staff time-off list. */
 ensureShape(store.state);
 store.subscribe((s) => ensureShape(s));
+
+/* The customer's page is the front door, so it is the first route and the one
+   an empty hash lands on. It is deliberately not a member of VIEWS: it has no
+   sidebar row, no section title and no desk chrome — it is the other side of
+   the same product. Every existing #/… link still resolves to its desk view. */
+const PUBLIC = 'book';
 
 const VIEWS = [
   { id: 'today', label: 'Today', icon: 'clock', group: 'Desk', title: 'Today', sub: 'Live queue', render: renderToday },
@@ -186,7 +193,7 @@ resetBtn.addEventListener('click', async () => {
   toast('Demo data reset', 'ok');
 });
 
-/* The one dark element in the sidebar: it has to stand out against the rose
+/* The one dark element in the sidebar: it has to stand out against the teal
    default without introducing a colour that is not already in the tokens. */
 const EXTERNAL = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 11.5v4a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1h4"/><path d="M11.5 3.5h5v5"/><path d="M9 11l7.5-7.5"/></svg>';
 const siteLink = h('a', {
@@ -219,8 +226,8 @@ const ui = (() => {
 })();
 const saveUI = () => { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch (_) {} };
 
-/* The brand rose sidebar is the default. Only an explicit choice stored under
-   this key can turn it off, so a fresh browser always opens rose. Nothing is
+/* The brand teal sidebar is the default. Only an explicit choice stored under
+   this key can turn it off, so a fresh browser always opens teal. Nothing is
    written back here — "no stored preference" stays literally true until the
    owner presses the control. */
 if (!('tone' in ui)) ui.tone = 'amber';
@@ -241,7 +248,7 @@ const RAIL_GLYPH = {
 };
 const TONE_GLYPH = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.6"/><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2z" fill="currentColor" stroke="none"/></svg>';
 /* the colour control names no colour at all: the glyph carries it and
-   aria-pressed reports whether the rose tone is on */
+   aria-pressed reports whether the teal tone is on */
 const TONE_LABEL = 'Sidebar colour';
 
 const railBtn = h('button', {
@@ -279,13 +286,26 @@ railBtn.addEventListener('click', () => { ui.rail = !ui.rail; saveUI(); applyChr
 toneBtn.addEventListener('click', () => { ui.tone = ui.tone === 'amber' ? 'plain' : 'amber'; saveUI(); applyChrome(); });
 wide.addEventListener('change', applyChrome);
 
-/* Footer: the two links, then install and reset. About moved to the topbar,
-   where it sits next to the demo marker it explains.
+/* The way back out to the customer's page. It sits at the head of the footer
+   rather than in the topbar: the topbar already carries five controls and
+   will not take a sixth at 320px, and this is a once-a-session move, not a
+   desk action. Same quietness as the "Staff desk" control on the way in. */
+const publicLink = h('a', {
+  class: 'navlink',
+  href: `#/${PUBLIC}`,
+  title: 'Booking page — the page customers see',
+  'aria-label': 'Booking page — the page customers see',
+  html: `${icon('eye')}<span>Booking page</span>`,
+});
+
+/* Footer: the way out, the two links, then install and reset. About moved to
+   the topbar, where it sits next to the demo marker it explains.
    The paired rows share their width and truncate rather than overflow; the kit
    stacks them back into a single column in the rail. */
 const installRow = h('div', { class: 'side__pair' }, resetBtn);
 
 sideEl.appendChild(h('div', { class: 'side__foot' },
+  h('div', { class: 'side__pair' }, publicLink),
   h('div', { class: 'side__pair' }, siteLink, srcLink),
   installRow,
   h('div', { class: 'side__sub small faint', style: 'padding:10px 10px 2px;line-height:1.5' },
@@ -311,6 +331,57 @@ const shellEl = h('div', { class: 'shell' },
 app.appendChild(shellEl);
 applyChrome();
 
+/* ---------- the customer's shell ---------- */
+/* No sidebar, no counts, no section title: one bar, one column, one footer.
+   It is the same design system seen from the other side, so it uses the kit's
+   type scale, radii, hairlines and the same accent — and none of the desk's
+   words. The bar carries the desk's own name rather than the product's,
+   because that is whose door this is. */
+const pubName = h('div', { class: 'pubbar__name' });
+const pubTag = h('div', { class: 'pubbar__tag' });
+const pubStaffBtn = h('a', {
+  class: 'btn btn--sm pubbar__staff',
+  href: '#/today',
+  title: 'Open the staff desk',
+  'aria-label': 'Open the staff desk',
+  html: `${icon('grid')}<span>Staff desk</span>`,
+});
+const pubHost = h('main', { class: 'pubmain', id: 'pubhost' });
+/* The one node on this page that outlives every redraw. src/views/book.js
+   writes each refusal and the confirmation into it, because a live region that
+   is itself replaced by the update it is meant to announce announces nothing. */
+const pubLive = h('p', { class: 'pub__sr', id: 'pub-live', role: 'status', 'aria-live': 'polite' });
+
+/* Both footer controls are real buttons rather than links inside a sentence:
+   this page is thumbed, and a 16px word in a paragraph is not a tap target. */
+const pubAboutBtn = h('button', { class: 'btn btn--sm', type: 'button' }, 'About this demo');
+pubAboutBtn.addEventListener('click', () => aboutModal());
+
+const pubShell = h('div', { class: 'pubshell' },
+  h('header', { class: 'pubbar' },
+    /* Not a link: it would point at the page it is already on. */
+    h('div', { class: 'pubbar__brand' },
+      h('span', { class: 'mark' }, 'SL'),
+      h('span', { class: 'pubbar__id' }, pubName, pubTag)),
+    h('div', { class: 'spacer' }),
+    themeToggle(),
+    pubStaffBtn),
+  pubLive,
+  pubHost,
+  h('footer', { class: 'pubfoot' },
+    h('p', { class: 'small muted' },
+      'A demo booking page. Everything on it is sample data kept in this browser — nothing is sent anywhere and no appointment is real.'),
+    h('div', { class: 'pubfoot__acts' },
+      pubAboutBtn,
+      h('a', {
+        class: 'btn btn--sm',
+        href: 'https://www.nasvih.in',
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        'aria-label': 'nasvih.in — opens in a new tab',
+      }, 'Built by nasvih.in'))));
+app.appendChild(pubShell);
+
 /* ---------- installable ---------- */
 /* Registers the service worker and adds an "Install app" control to the sidebar
    footer, but only when the browser says installing is actually possible. */
@@ -324,7 +395,7 @@ const installBtn = initPWA({
 if (installBtn) installRow.insertBefore(installBtn, installRow.firstChild);
 
 /* ---------- context handed to every view ---------- */
-let current = 'today';
+let current = PUBLIC;
 const ctx = {
   store,
   get state() { return store.state; },
@@ -380,37 +451,63 @@ function drawNav() {
 
 /* ---------- render ---------- */
 function draw() {
-  const v = VIEWS.find((x) => x.id === current) || VIEWS[0];
-  titleEl.textContent = v.title;
-  subEl.textContent = v.sub;
-  document.title = `${v.title} · slotly`;
+  const isPublic = current === PUBLIC;
+  /* One of the two shells is in the document at a time. [hidden] is
+     display:none!important in the kit, so the hidden one is out of the layout
+     entirely rather than merely invisible. */
+  shellEl.hidden = isPublic;
+  pubShell.hidden = !isPublic;
+  /* The desk assistant belongs to the desk. */
+  document.body.classList.toggle('is-public', isPublic);
+
+  const host = isPublic ? pubHost : viewHost;
+  const v = isPublic ? null : (VIEWS.find((x) => x.id === current) || VIEWS[0]);
+  if (isPublic) {
+    pubName.textContent = store.state.settings.deskName;
+    pubTag.textContent = store.state.settings.branch;
+    document.title = 'Book an appointment · slotly';
+  } else {
+    titleEl.textContent = v.title;
+    subEl.textContent = v.sub;
+    document.title = `${v.title} · slotly`;
+  }
+
   const scroll = window.scrollY;
-  viewHost.innerHTML = '';
+  host.innerHTML = '';
   try {
-    viewHost.appendChild(v.render(ctx));
+    host.appendChild(isPublic ? renderBook(ctx) : v.render(ctx));
   } catch (err) {
-    viewHost.appendChild(h('div', { class: 'empty' },
+    host.appendChild(h('div', { class: 'empty' },
       h('h3', {}, 'That screen could not be drawn'),
       h('p', { class: 'small muted' }, String(err && err.message ? err.message : err))));
   }
-  drawNav();
+  if (!isPublic) drawNav();
   window.scrollTo(0, Math.min(scroll, document.body.scrollHeight));
 }
 
-const routes = Object.fromEntries(VIEWS.map((v) => [v.id, true]));
+/* PUBLIC is declared first, so an empty hash — the bare URL — resolves to it,
+   and so does anything unrecognised. Every existing #/today, #/calendar … link
+   still names its own view. */
+const routes = Object.fromEntries([[PUBLIC, true], ...VIEWS.map((v) => [v.id, true])]);
 const nav = router(routes, (route, params, query) => {
+  /* Leaving the booking page throws its half-filled form and its confirmation
+     away: the next visitor to that screen is a different person. */
+  if (current === PUBLIC && route !== PUBLIC) resetBookingPage();
   current = route;
   ctx.params = params;
   ctx.query = query;
   setDrawer(false);
+  if (bot && route === PUBLIC) bot.toggle(false);
   draw();
 });
-store.subscribe(() => draw());
-nav.go();
-
 /* ---------- assistant ---------- */
+/* Mounted before the first route runs: the router closes it when it lands on
+   the customer's page, so it has to exist by then. */
 const bot = buildAgent(ctx);
 bot.mount(document.body);
+
+store.subscribe(() => draw());
+nav.go();
 
 /* ---------- keyboard ---------- */
 const SHORTCUTS = [
@@ -432,7 +529,20 @@ function shortcutsModal() {
   });
 }
 
+/* ⌘K opens the desk assistant, and lib/assistant.js listens for it on the
+   document. The customer's page has no assistant, so it stops the key in the
+   capture phase — before the document's own bubble listener ever sees it —
+   rather than letting a panel open behind a stylesheet that hides it. */
 document.addEventListener('keydown', (e) => {
+  if (current !== PUBLIC) return;
+  if ((e.metaKey || e.ctrlKey) && e.key && e.key.toLowerCase() === 'k') e.stopPropagation();
+}, true);
+
+document.addEventListener('keydown', (e) => {
+  /* Every shortcut below is a desk shortcut — a number that jumps to a section,
+     a key that opens the booking dialog. None of them mean anything on the
+     customer's page, where the whole screen is the one thing to do. */
+  if (current === PUBLIC) return;
   const t = e.target;
   const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
   if (typing || e.metaKey || e.ctrlKey || e.altKey) return;

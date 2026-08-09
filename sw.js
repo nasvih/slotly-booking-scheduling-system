@@ -3,7 +3,7 @@
    network), and a single versioned cache so an update wipes the old one.
    Bump CACHE_VERSION whenever the file list or any cached asset changes. */
 
-const CACHE_VERSION = 'v9';
+const CACHE_VERSION = 'v10';
 const CACHE = `${self.registration.scope}::${CACHE_VERSION}`;
 
 /* slotly's own files. Every one of these must exist: a single 404 fails the
@@ -30,6 +30,7 @@ const SHELL = [
   './src/notify.js',
   './src/chrome.js',
   './src/drawer.js',
+  './src/views/book.js',
   './src/views/today.js',
   './src/views/calendar.js',
   './src/views/bookings.js',
