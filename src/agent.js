@@ -8,6 +8,12 @@
    Two kinds of intent live here. The ones in this file read and report.
    The ones in actions.js propose a change and apply it when the reader
    presses the button on the answer.
+
+   Every reader-facing string comes from the dictionary through `t`.
+   `t` is re-exported by main.js, which imports this module, so it is
+   still in its temporal dead zone while this file evaluates — every
+   call below therefore sits inside a function body, never at the top
+   level.
    ============================================================ */
 
 import { Assistant } from '../lib/assistant.js';
@@ -15,10 +21,12 @@ import {
   todayKey, addDays, weekStart, parseDay, dayLabel, relativeDay, hm12,
   freeSlots, nextAvailable, utilisation, hourLoad, customerStats, isOpenDay,
   svcOf, staffOf, custOf, tokenLabel, staffWorks, shiftMinutes, gridSlots,
-  STATUS, DOW_LONG,
+  STATUS, dowLong,
+  svcName, staffRole, staffRoom, deskName, branchName,
 } from './data.js';
+import { t } from './main.js';
 import { matchDay, matchService, matchStaff, matchCustomer } from './parse.js';
-import { actionIntents, ACTION_CHIPS } from './actions.js';
+import { actionIntents, actionChips } from './actions.js';
 
 const money = (state, n) => `${state.settings.currency}${Number(n || 0).toLocaleString('en-IN')}`;
 const live = (state, from, to) => state.bookings.filter((b) => b.date >= from && b.date <= to && b.status !== 'cancelled');
@@ -29,7 +37,7 @@ function intents() {
     {
       id: 'free-slots',
       match: [/free|available|availability|open slot|vacan|any space|any room|book(?:able)? slot/i, 'slots on', 'what is free'],
-      trace: 'walked the rota against every booked block',
+      trace: t('ans.trace.freeSlots'),
       answer: (q, state) => {
         let key = matchDay(q) || todayKey();
         const serviceId = matchService(state, q) || (state.services.find((s) => s.active) || {}).id;
@@ -37,19 +45,27 @@ function intents() {
         const svc = svcOf(state, serviceId);
         let note = '';
         if (!isOpenDay(state, key)) {
-          const shut = DOW_LONG[parseDay(key).getDay()];
+          const shut = dowLong(parseDay(key).getDay());
           let roll = key;
           for (let i = 1; i <= 7 && !isOpenDay(state, roll); i += 1) roll = addDays(key, i);
-          note = `The desk is closed on ${shut}, so I rolled forward to ${relativeDay(roll)}.\n\n`;
+          note = t('ans.freeSlots.rolled', { day: shut, to: relativeDay(roll) });
           key = roll;
         }
         const slots = freeSlots(state, key, serviceId, staffId);
         if (!slots.length) {
           const nx = nextAvailable(state, serviceId, staffId, key);
           return {
-            text: note + `**${svc.name}** has nothing free on ${relativeDay(key)}${staffId ? ` with ${staffOf(state, staffId).name}` : ''}.`
-              + (nx ? `\n\nThe first opening is ${relativeDay(nx.date)} at **${hm12(nx.time)}** with ${staffOf(state, nx.staffIds[0]).name}.` : '\n\nNothing opens up in the next three weeks either.'),
-            meta: `checked ${gridSlots(state).length} grid slots`,
+            text: note + t('ans.freeSlots.none', {
+              service: svcName(svc),
+              day: relativeDay(key),
+              staff: staffId ? staffOf(state, staffId).name : '',
+            })
+              + (nx
+                ? t('ans.freeSlots.firstOpening', {
+                  day: relativeDay(nx.date), time: hm12(nx.time), staff: staffOf(state, nx.staffIds[0]).name,
+                })
+                : t('ans.freeSlots.nothingAhead')),
+            meta: t('ans.freeSlots.checked', { n: gridSlots(state).length }),
           };
         }
         const rows = slots.slice(0, 10).map((s) => [
@@ -57,11 +73,16 @@ function intents() {
           s.staffIds.map((id) => staffOf(state, id).name.split(' ')[0]).join(', '),
         ]);
         return {
-          text: note + `**${slots.length} open slot${slots.length === 1 ? '' : 's'}** for ${svc.name} on ${relativeDay(key)}`
-            + `${staffId ? ` with ${staffOf(state, staffId).name}` : ''}. Each one holds the full ${svc.durationMin + svc.bufferMin} minute block.`,
-          table: { head: ['Time', 'Who is free'], rows },
-          meta: `${slots.length} of ${gridSlots(state).length} grid slots open`,
-          suggestions: ["Today's load", 'Busiest hour', 'Who might not turn up'],
+          text: note + t('ans.freeSlots.head', {
+            n: slots.length,
+            service: svcName(svc),
+            day: relativeDay(key),
+            staff: staffId ? staffOf(state, staffId).name : '',
+            block: svc.durationMin + svc.bufferMin,
+          }),
+          table: { head: t('ans.freeSlots.cols'), rows },
+          meta: t('ans.freeSlots.meta', { open: slots.length, total: gridSlots(state).length }),
+          suggestions: [t('ans.chips.todayLoad'), t('ans.chips.busiest'), t('ans.chips.noShow')],
         };
       },
     },
@@ -69,118 +90,153 @@ function intents() {
       id: 'next-available',
       match: [/next available|earliest|soonest|first free|when can (?:i|we|you)|next opening/i,
         'next available', 'earliest', 'soonest', 'first free', 'next opening', 'next slot'],
-      trace: 'scanned forward 21 days across the rota',
+      trace: t('ans.trace.nextAvailable'),
       answer: (q, state) => {
         const staffId = matchStaff(state, q);
         const serviceId = matchService(state, q) || (state.services.find((s) => s.active) || {}).id;
         const svc = svcOf(state, serviceId);
         const nx = nextAvailable(state, serviceId, staffId, todayKey());
         if (!nx) {
-          return { text: `Nothing opens for **${svc.name}**${staffId ? ` with ${staffOf(state, staffId).name}` : ''} in the next three weeks. Either the rota has no shift with that skill or every block is taken.` };
+          return {
+            text: t('ans.nextAvailable.none', {
+              service: svcName(svc),
+              staff: staffId ? staffOf(state, staffId).name : '',
+            }),
+          };
         }
         const alt = state.staff
           .filter((st) => st.active && st.skills.includes(serviceId) && st.id !== nx.staffIds[0])
           .map((st) => {
             const n = nextAvailable(state, serviceId, st.id, todayKey());
-            return n ? [st.name, `${relativeDay(n.date)} ${hm12(n.time)}`] : [st.name, 'nothing in 21 days'];
+            return n ? [st.name, `${relativeDay(n.date)} ${hm12(n.time)}`] : [st.name, t('ans.nextAvailable.nothing21')];
           });
         return {
-          text: `Earliest **${svc.name}**${staffId ? ` with ${staffOf(state, staffId).name}` : ''} is **${relativeDay(nx.date)} at ${hm12(nx.time)}**`
-            + `${staffId ? '' : ` — ${staffOf(state, nx.staffIds[0]).name} takes it`}. That is ${dayLabel(nx.date)}.`,
-          table: alt.length ? { head: ['Other staff', 'Their first opening'], rows: alt } : null,
-          suggestions: ['Free slots on Friday', "Today's load", 'Busiest hour'],
+          text: t('ans.nextAvailable.text', {
+            service: svcName(svc),
+            staff: staffId ? staffOf(state, staffId).name : '',
+            day: relativeDay(nx.date),
+            time: hm12(nx.time),
+            taker: staffId ? '' : staffOf(state, nx.staffIds[0]).name,
+            full: dayLabel(nx.date),
+          }),
+          table: alt.length ? { head: t('ans.nextAvailable.cols'), rows: alt } : null,
+          suggestions: [t('ans.chips.freeFriday'), t('ans.chips.todayLoad'), t('ans.chips.busiest')],
         };
       },
     },
     {
       id: 'queue-now',
       match: [/queue|now serving|who is waiting|who'?s waiting|token|called|next up/i, 'waiting'],
-      trace: 'read the live queue for today',
+      trace: t('ans.trace.queue'),
       answer: (q, state) => {
         const key = todayKey();
         const day = state.bookings.filter((b) => b.date === key && b.status !== 'cancelled')
           .sort((a, b) => a.time.localeCompare(b.time));
         const serving = day.find((b) => b.status === 'serving');
         const waiting = day.filter((b) => b.status === 'booked' || b.status === 'called');
-        if (!day.length) return { text: `Nothing is booked for ${relativeDay(key)}, so the queue is empty.` };
+        if (!day.length) return { text: t('ans.queue.empty', { day: relativeDay(key) }) };
         const rows = waiting.slice(0, 8).map((b) => [
           `**${tokenLabel(state, b)}**`, hm12(b.time), custOf(state, b.customerId).name,
           svcOf(state, b.serviceId).code, (STATUS[b.status] || {}).label || b.status,
         ]);
         return {
           text: serving
-            ? `**${tokenLabel(state, serving)}** is at the chair now — ${custOf(state, serving.customerId).name}, ${svcOf(state, serving.serviceId).name} with ${staffOf(state, serving.staffId).name}. **${waiting.length}** still waiting.`
-            : `Nobody is being served right now. **${waiting.length}** token${waiting.length === 1 ? '' : 's'} still waiting today.`,
-          table: rows.length ? { head: ['Token', 'Time', 'Customer', 'Service', 'State'], rows } : null,
-          meta: `${day.length} bookings on today's sheet`,
-          suggestions: ["Today's load", 'Who might not turn up', 'Free slots tomorrow'],
+            ? t('ans.queue.serving', {
+              token: tokenLabel(state, serving),
+              name: custOf(state, serving.customerId).name,
+              service: svcName(svcOf(state, serving.serviceId)),
+              staff: staffOf(state, serving.staffId).name,
+              waiting: waiting.length,
+            })
+            : t('ans.queue.idle', { waiting: waiting.length }),
+          table: rows.length ? { head: t('ans.queue.cols'), rows } : null,
+          meta: t('ans.queue.meta', { n: day.length }),
+          suggestions: [t('ans.chips.todayLoad'), t('ans.chips.noShow'), t('ans.chips.freeTomorrow')],
         };
       },
     },
     {
       id: 'today-load',
       match: [/today'?s load|how busy|load today|busy today|how many.*(today|booked)|capacity today/i, 'load'],
-      trace: 'totalled booked minutes against shift minutes',
+      trace: t('ans.trace.load'),
       answer: (q, state) => {
         const key = matchDay(q) || todayKey();
         const day = state.bookings.filter((b) => b.date === key && b.status !== 'cancelled');
         const util = utilisation(state, key);
         const done = day.filter((b) => b.status === 'done');
         const takings = done.reduce((n, b) => n + svcOf(state, b.serviceId).priceInr, 0);
-        if (!isOpenDay(state, key)) return { text: `${dayLabel(key)} is a closed day, so the sheet is empty.` };
+        if (!isOpenDay(state, key)) return { text: t('ans.load.closed', { day: dayLabel(key) }) };
         return {
-          text: `${relativeDay(key)} holds **${day.length} bookings** across ${state.staff.filter((s) => staffWorks(state, s.id, key)).length} staff on shift.`
-            + `\n\n- Chair time booked: **${util.pct}%** (${util.used} of ${util.capacity} minutes)`
-            + `\n- Completed: ${done.length}, billed ${money(state, takings)}`
-            + `\n- No-shows so far: ${day.filter((b) => b.status === 'no-show').length}`,
+          text: t('ans.load.text', {
+            day: relativeDay(key),
+            n: day.length,
+            staff: state.staff.filter((s) => staffWorks(state, s.id, key)).length,
+            pct: util.pct,
+            used: util.used,
+            capacity: util.capacity,
+            done: done.length,
+            money: money(state, takings),
+            noShows: day.filter((b) => b.status === 'no-show').length,
+          }),
           table: {
-            head: ['Staff', 'Bookings', 'Booked min', 'Load'],
+            head: t('ans.load.cols'),
             rows: util.perStaff.map((p) => [
               p.name,
               String(day.filter((b) => b.staffId === p.staffId).length),
-              p.capacity ? `${p.booked} / ${p.capacity}` : 'day off',
-              p.capacity ? `**${p.pct}%**` : '—',
+              p.capacity ? `${p.booked} / ${p.capacity}` : t('ans.load.dayOff'),
+              p.capacity ? `**${p.pct}%**` : t('common.none'),
             ]),
           },
-          suggestions: ['Busiest hour', 'Free slots tomorrow', 'Who might not turn up'],
+          suggestions: [t('ans.chips.busiest'), t('ans.chips.freeTomorrow'), t('ans.chips.noShow')],
         };
       },
     },
     {
       id: 'busiest-hour',
       match: [/busiest|peak|quietest|slowest|which hour|what time.*busy|rush/i, 'busiest hour'],
-      trace: 'grouped 30 days of bookings by opening hour',
+      trace: t('ans.trace.busiest'),
       answer: (q, state) => {
         const from = addDays(todayKey(), -30);
         const to = addDays(todayKey(), 7);
         const load = hourLoad(state, from, to);
-        if (!load.length) return { text: 'There is nothing in the last 30 days to group by hour yet.' };
+        if (!load.length) return { text: t('ans.busiest.none') };
         const sorted = load.slice().sort((a, b) => b.count - a.count);
         const top = sorted[0];
         const quiet = sorted[sorted.length - 1];
         return {
-          text: `Across the last 30 days and the week ahead, **${hm12(top.hour)}–${hm12(`${String(Number(top.hour.slice(0, 2)) + 1).padStart(2, '0')}:00`)}** is the rush with **${top.count} bookings**.`
-            + `\n\nThe quietest open hour is ${hm12(quiet.hour)} with ${quiet.count}. Two extra ${svcOf(state, 'svc-lab').code || 'short'} blocks there would not cost you a busy slot.`,
+          text: t('ans.busiest.text', {
+            from: hm12(top.hour),
+            to: hm12(`${String(Number(top.hour.slice(0, 2)) + 1).padStart(2, '0')}:00`),
+            count: top.count,
+            quietHour: hm12(quiet.hour),
+            quietCount: quiet.count,
+            code: svcOf(state, 'svc-lab').code || t('ans.busiest.shortCode'),
+          }),
           table: {
-            head: ['Hour', 'Bookings'],
+            head: t('ans.busiest.cols'),
             rows: load.map((r) => [hm12(r.hour), r.hour === top.hour ? `**${r.count}**` : String(r.count)]),
           },
-          suggestions: ["Today's load", 'Free slots on Friday', 'Which service earns most'],
+          suggestions: [t('ans.chips.todayLoad'), t('ans.chips.freeFriday'), t('ans.chips.earnsMost')],
         };
       },
     },
     {
       id: 'no-show-risk',
       match: [/no.?show|turn(?:s|ed|ing)? up|show(?:s|ed)? up|miss(?:es|ed|ing)?\b|skip|risk|reminder call|unreliable/i, 'no show'],
-      trace: 'scored every customer on missed against settled bookings',
+      trace: t('ans.trace.noShow'),
       answer: (q, state) => {
         const named = matchCustomer(state, q);
         if (named) {
           const st = customerStats(state, named.id);
           return {
-            text: `**${named.name}** has missed **${st.noShows}** of ${st.attended + st.noShows} settled bookings — a no-show rate of **${st.rate}%**.`
-              + `\n\n${st.upcoming ? `${st.upcoming} booking ahead. Worth a reminder call the evening before.` : 'Nothing booked ahead right now.'}`,
-            meta: `${st.total} records on file`,
+            text: t('ans.noShow.named', {
+              name: named.name,
+              missed: st.noShows,
+              settled: st.attended + st.noShows,
+              rate: st.rate,
+            })
+              + (st.upcoming ? t('ans.noShow.ahead', { n: st.upcoming }) : t('ans.noShow.noneAhead')),
+            meta: t('ans.noShow.meta', { n: st.total }),
           };
         }
         const key = todayKey();
@@ -193,20 +249,27 @@ function intents() {
           && (b.status === 'booked' || b.status === 'called')
           && risky.some((r) => r.c.id === b.customerId));
         return {
-          text: `**${risky.length} customers** are carrying a no-show rate of 20% or more.`
-            + `\n\n${todayRisky.length ? `**${todayRisky.length}** of them are on today's sheet: ${todayRisky.map((b) => `${custOf(state, b.customerId).name} at ${hm12(b.time)}`).join(', ')}.` : 'None of them are booked today.'}`,
+          text: t('ans.noShow.list', { n: risky.length })
+            + (todayRisky.length
+              ? t('ans.noShow.onSheet', {
+                n: todayRisky.length,
+                who: todayRisky.map((b) => t('ans.noShow.at', {
+                  name: custOf(state, b.customerId).name, time: hm12(b.time),
+                })).join(', '),
+              })
+              : t('ans.noShow.noneToday')),
           table: {
-            head: ['Customer', 'Missed', 'Rate', 'Booked ahead'],
+            head: t('ans.noShow.cols'),
             rows: risky.map((r) => [r.c.name, String(r.st.noShows), `**${r.st.rate}%**`, String(r.st.upcoming)]),
           },
-          suggestions: ['Queue right now', "Today's load", 'Cancellations this week'],
+          suggestions: [t('ans.chips.queueNow'), t('ans.chips.todayLoad'), t('ans.chips.cancellations')],
         };
       },
     },
     {
       id: 'staff-load',
       match: [/utilisation|utilization|workload|how busy is|rota|working hours|who is on|who'?s on|shift|day off/i, 'staff'],
-      trace: 'summed shift minutes across the current week',
+      trace: t('ans.trace.staff'),
       answer: (q, state) => {
         const staffId = matchStaff(state, q);
         const week = weekStart(todayKey());
@@ -221,17 +284,27 @@ function intents() {
         const st = staffId ? staffOf(state, staffId) : null;
         return {
           text: st
-            ? `**${st.name}** (${st.role}) works ${st.days.map((d) => DOW_LONG[d].slice(0, 3)).join(', ')}, ${hm12(st.start)} to ${hm12(st.end)}, break ${hm12(st.breakStart)}–${hm12(st.breakEnd)}, in ${st.room}. Skills: ${st.skills.map((id) => svcOf(state, id).name).join(', ')}.`
-            : `Week of ${dayLabel(week)} — booked minutes against shift minutes for each person.`,
-          table: { head: ['Staff', 'Bookings', 'Minutes', 'Load'], rows },
-          suggestions: ['Next available with Anwar', "Today's load", 'Free slots tomorrow'],
+            ? t('ans.staff.one', {
+              name: st.name,
+              role: staffRole(st),
+              days: st.days.map((d) => dowLong(d).slice(0, 3)).join(', '),
+              from: hm12(st.start),
+              to: hm12(st.end),
+              breakFrom: hm12(st.breakStart),
+              breakTo: hm12(st.breakEnd),
+              room: staffRoom(st),
+              skills: st.skills.map((id) => svcName(svcOf(state, id))).join(', '),
+            })
+            : t('ans.staff.week', { day: dayLabel(week) }),
+          table: { head: t('ans.staff.cols'), rows },
+          suggestions: [t('ans.chips.nextAnwar'), t('ans.chips.todayLoad'), t('ans.chips.freeTomorrow')],
         };
       },
     },
     {
       id: 'service-mix',
       match: [/most booked|popular|top service|service mix|which service|best selling|earns most/i, 'services'],
-      trace: 'grouped 30 days of completed appointments by service',
+      trace: t('ans.trace.services'),
       answer: (q, state) => {
         const from = addDays(todayKey(), -30);
         const rows = state.services.map((s) => {
@@ -241,103 +314,126 @@ function intents() {
         const top = rows[0];
         const total = rows.reduce((n, r) => n + r.rev, 0);
         return {
-          text: `Over the last 30 days the desk billed **${money(state, total)}** across ${rows.reduce((n, r) => n + r.count, 0)} completed appointments.`
-            + `\n\n**${top.s.name}** leads on money at ${money(state, top.rev)} from ${top.count} appointments.`,
+          text: t('ans.services.text', {
+            money: money(state, total),
+            done: rows.reduce((n, r) => n + r.count, 0),
+            top: svcName(top.s),
+            topMoney: money(state, top.rev),
+            topCount: top.count,
+          }),
           table: {
-            head: ['Service', 'Done', 'Billed', 'Block'],
-            rows: rows.map((r) => [r.s.name, String(r.count), money(state, r.rev), `${r.s.durationMin + r.s.bufferMin}m`]),
+            head: t('ans.services.cols'),
+            rows: rows.map((r) => [svcName(r.s), String(r.count), money(state, r.rev), t('common.minShort', { n: r.s.durationMin + r.s.bufferMin })]),
           },
-          suggestions: ['Busiest hour', 'Takings this week', 'Free slots tomorrow'],
+          suggestions: [t('ans.chips.busiest'), t('ans.chips.takings'), t('ans.chips.freeTomorrow')],
         };
       },
     },
     {
       id: 'revenue',
       match: [/revenue|takings|billed|income|money|earned|how much/i, 'takings'],
-      trace: 'priced completed bookings against the service list',
+      trace: t('ans.trace.revenue'),
       answer: (q, state) => {
-        const t = todayKey();
-        const week = weekStart(t);
+        const tk = todayKey();
+        const week = weekStart(tk);
         const sum = (from, to) => state.bookings
           .filter((b) => b.date >= from && b.date <= to && b.status === 'done')
           .reduce((n, b) => n + svcOf(state, b.serviceId).priceInr, 0);
         const booked = state.bookings
-          .filter((b) => b.date >= t && (b.status === 'booked' || b.status === 'called' || b.status === 'serving'))
+          .filter((b) => b.date >= tk && (b.status === 'booked' || b.status === 'called' || b.status === 'serving'))
           .reduce((n, b) => n + svcOf(state, b.serviceId).priceInr, 0);
         return {
-          text: `Takings from completed appointments:`
-            + `\n\n- Today: **${money(state, sum(t, t))}**`
-            + `\n- This week so far: **${money(state, sum(week, t))}**`
-            + `\n- Last 30 days: **${money(state, sum(addDays(t, -30), t))}**`
-            + `\n\nStill on the book from today onward: ${money(state, booked)} across ${state.bookings.filter((b) => b.date >= t && b.status === 'booked').length} open bookings.`,
-          meta: 'no-shows and cancellations are not billed',
-          suggestions: ['Which service earns most', "Today's load", 'Cancellations this week'],
+          text: t('ans.revenue.text', {
+            today: money(state, sum(tk, tk)),
+            week: money(state, sum(week, tk)),
+            month: money(state, sum(addDays(tk, -30), tk)),
+            booked: money(state, booked),
+            open: state.bookings.filter((b) => b.date >= tk && b.status === 'booked').length,
+          }),
+          meta: t('ans.revenue.meta'),
+          suggestions: [t('ans.chips.earnsMost'), t('ans.chips.todayLoad'), t('ans.chips.cancellations')],
         };
       },
     },
     {
       id: 'cancellations',
       match: [/cancel|cancellation|dropped|released|freed up/i, 'cancellations'],
-      trace: 'compared cancelled records against the same period last fortnight',
+      trace: t('ans.trace.cancellations'),
       answer: (q, state) => {
-        const t = todayKey();
-        const week = weekStart(t);
+        const tk = todayKey();
+        const week = weekStart(tk);
         const end = addDays(week, 6);
         const thisWeek = state.bookings.filter((b) => b.date >= week && b.date <= end && b.status === 'cancelled');
         const prev = state.bookings.filter((b) => b.date >= addDays(week, -7) && b.date < week && b.status === 'cancelled');
         const byStaff = state.staff.map((st) => [st.name, String(thisWeek.filter((b) => b.staffId === st.id).length)]);
         return {
-          text: `**${thisWeek.length} cancellation${thisWeek.length === 1 ? '' : 's'}** in the week of ${dayLabel(week)}, against ${prev.length} the week before.`
-            + `\n\nThose released **${thisWeek.reduce((n, b) => n + b.blockMin, 0)} minutes** back onto the grid — they show as free slots again in the calendar.`,
-          table: { head: ['Staff', 'Cancelled this week'], rows: byStaff },
-          suggestions: ['Who might not turn up', 'Free slots tomorrow', "Today's load"],
+          text: t('ans.cancellations.text', {
+            n: thisWeek.length,
+            day: dayLabel(week),
+            prev: prev.length,
+            minutes: thisWeek.reduce((n, b) => n + b.blockMin, 0),
+          }),
+          table: { head: t('ans.cancellations.cols'), rows: byStaff },
+          suggestions: [t('ans.chips.noShow'), t('ans.chips.freeTomorrow'), t('ans.chips.todayLoad')],
         };
       },
     },
     {
       id: 'customer-lookup',
       match: [/history for|tell me about|customer|record for|has .* been|when did .* last/i, 'history'],
-      trace: 'pulled the customer record and every linked booking',
+      trace: t('ans.trace.customer'),
       answer: (q, state) => {
         const c = matchCustomer(state, q);
         if (!c) {
           return {
-            text: 'I could not pick a name out of that. Ask me with the customer name in it, for example `history for Meera` — the desk holds '
-              + `${state.customers.length} customers.`,
-            suggestions: ['Who might not turn up', 'Queue right now', "Today's load"],
+            text: t('ans.customer.noName', { n: state.customers.length }),
+            suggestions: [t('ans.chips.noShow'), t('ans.chips.queueNow'), t('ans.chips.todayLoad')],
           };
         }
         const st = customerStats(state, c.id);
         const recent = state.bookings.filter((b) => b.customerId === c.id)
           .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
         return {
-          text: `**${c.name}** · ${c.phone} · on file since ${dayLabel(c.since)}.`
-            + `\n\n- ${st.attended} visits kept, ${st.noShows} missed, ${st.cancelled} cancelled`
-            + `\n- No-show rate **${st.rate}%**`
-            + `\n- Billed ${money(state, st.spend)} in total`
-            + `\n- ${st.upcoming ? `${st.upcoming} booking ahead` : 'nothing booked ahead'}`,
+          text: t('ans.customer.text', {
+            name: c.name,
+            phone: c.phone,
+            since: dayLabel(c.since),
+            attended: st.attended,
+            noShows: st.noShows,
+            cancelled: st.cancelled,
+            rate: st.rate,
+            spend: money(state, st.spend),
+            ahead: st.upcoming ? t('ans.customer.ahead', { n: st.upcoming }) : t('ans.customer.noneAhead'),
+          }),
           table: {
-            head: ['Date', 'Service', 'Staff', 'Outcome'],
+            head: t('ans.customer.cols'),
             rows: recent.map((b) => [dayLabel(b.date), svcOf(state, b.serviceId).code, staffOf(state, b.staffId).name.split(' ')[0], (STATUS[b.status] || {}).label || b.status]),
           },
-          suggestions: ['Who might not turn up', 'Next available with Rehana'],
+          suggestions: [t('ans.chips.noShow'), t('ans.chips.nextRehana')],
         };
       },
     },
     {
       id: 'desk-setup',
       match: [/opening hours|slot length|template|confirmation message|closed day|settings|how long is a slot/i, 'opening hours'],
-      trace: 'read the desk configuration',
+      trace: t('ans.trace.setup'),
       answer: (q, state) => {
         const s = state.settings;
         return {
-          text: `**${s.deskName}** — ${s.branch}.`
-            + `\n\n- Open ${hm12(s.openTime)} to ${hm12(s.closeTime)}, ${gridSlots(state).length} slots a day at ${s.slotMinutes} minutes each`
-            + `\n- Closed on ${s.closedDays.length ? s.closedDays.map((d) => DOW_LONG[d]).join(', ') : 'no fixed day'}`
-            + `\n- Tokens run ${s.tokenPrefix}001 upward, reset each day`
-            + `\n- ${state.services.filter((x) => x.active).length} bookable services, ${state.staff.filter((x) => x.active).length} staff taking bookings`
-            + `\n\nThe confirmation template currently reads: \`${s.confirmTemplate.slice(0, 90)}…\``,
-          suggestions: ["Today's load", 'Free slots tomorrow', 'Which service earns most'],
+          text: t('ans.setup.text', {
+            desk: deskName(state),
+            branch: branchName(state),
+            from: hm12(s.openTime),
+            to: hm12(s.closeTime),
+            slots: gridSlots(state).length,
+            step: s.slotMinutes,
+            closed: s.closedDays.length ? s.closedDays.map((d) => dowLong(d)).join(', ') : t('ans.setup.noFixedDay'),
+            prefix: s.tokenPrefix,
+            services: state.services.filter((x) => x.active).length,
+            staff: state.staff.filter((x) => x.active).length,
+            template: s.confirmTemplate.slice(0, 90),
+          }),
+          suggestions: [t('ans.chips.todayLoad'), t('ans.chips.freeTomorrow'), t('ans.chips.earnsMost')],
         };
       },
     },
@@ -346,20 +442,30 @@ function intents() {
 
 export function buildAgent(ctx) {
   return new Assistant({
-    name: 'Slotly Desk',
-    initials: 'SD',
-    tag: 'Front desk agent · demo',
-    greeting: 'I read the live rota in this browser, and I can change it. Ask me what is free or how loaded a day is — or tell me to book someone in, move a booking, cancel one, call the next token, hold a staff member\'s afternoon or change a service. Ask **what can you do?** for the full list.',
-    suggestions: ACTION_CHIPS,
-    note: 'Simulated agent — answers are matched against this app\'s own demo data. No connected model, no request leaves your browser.',
+    name: t('agent.name'),
+    initials: t('agent.initials'),
+    tag: t('agent.tag'),
+    greeting: t('agent.greeting'),
+    suggestions: actionChips(),
+    note: t('agent.note'),
     intents: [...intents(), ...actionIntents(ctx)],
-    fallbacks: [
-      'I can only work from this desk\'s own data. Try: "what is free on Friday for physiotherapy".',
-      'Not something I hold. Ask me about the queue, the rota, no-show rates or takings — or ask what I can change.',
-      'I did not catch a date, a service or a name in that. Ask me which slots are free on Friday and I will pull the rota.',
-      'That one is outside the demo data set. Try "next available with Anwar", "busiest hour", or "what can you do?".',
-    ],
+    fallbacks: t('agent.fallbacks'),
     context: () => ctx.state,
+    /* The panel's own furniture — lib/assistant.js keeps English defaults for
+       apps that ship no dictionary, so it is handed this one's. */
+    ui: {
+      askAbout: (name) => t('agent.ui.askAbout', { name }),
+      openAria: (name) => t('agent.ui.openAria', { name }),
+      clear: t('agent.ui.clear'),
+      close: t('agent.ui.close'),
+      send: t('agent.ui.send'),
+      placeholder: t('agent.ui.placeholder'),
+      you: t('agent.ui.you'),
+      working: t('agent.ui.working'),
+      edgeCase: t('agent.ui.edgeCase'),
+      actionFailed: t('agent.ui.actionFailed'),
+      done: t('agent.ui.done'),
+    },
   });
 }
 

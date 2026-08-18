@@ -6,6 +6,7 @@
    ============================================================ */
 
 import { h } from '../lib/ui.js';
+import { t } from './main.js';
 
 export const THEME_KEY = 'slotly.theme';
 export const IS_FRAMED = new URLSearchParams(location.search).has('frame');
@@ -45,7 +46,7 @@ export function themeToggle() {
   const paint = () => {
     const mode = readTheme();
     applyTheme(mode);
-    const label = mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+    const label = mode === 'dark' ? t('chrome.toLight') : t('chrome.toDark');
     btn.innerHTML = mode === 'dark' ? SUN : MOON;
     btn.setAttribute('aria-label', label);
     btn.setAttribute('aria-pressed', String(mode === 'dark'));
@@ -83,15 +84,15 @@ const FRAME_H = 844;
 export function deviceControls({ appName = 'slotly' } = {}) {
   const phoneBtn = h('button', {
     class: 'btn btn--ghost btn--icon', type: 'button',
-    'aria-label': 'Preview at phone size', title: 'Preview at phone size',
+    'aria-label': t('chrome.phone'), title: t('chrome.phone'),
     'aria-pressed': 'false', html: PHONE,
   });
   const deskBtn = h('button', {
     class: 'btn btn--ghost btn--icon is-on', type: 'button',
-    'aria-label': 'Back to desktop size', title: 'Back to desktop size',
+    'aria-label': t('chrome.desktop'), title: t('chrome.desktop'),
     'aria-pressed': 'true', html: DESKTOP,
   });
-  const group = h('div', { class: 'devseg', role: 'group', 'aria-label': 'Device preview' }, deskBtn, phoneBtn);
+  const group = h('div', { class: 'devseg', role: 'group', 'aria-label': t('chrome.group') }, deskBtn, phoneBtn);
 
   let stage = null;
 
@@ -131,21 +132,21 @@ export function deviceControls({ appName = 'slotly' } = {}) {
     url.searchParams.set('frame', '1');
     const frame = h('iframe', {
       class: 'devframe',
-      title: `${appName} at phone size`,
+      title: t('chrome.frame', { app: appName }),
       src: url.toString(),
       width: String(FRAME_W),
       height: String(FRAME_H),
       loading: 'eager',
     });
     bezel = h('div', { class: 'devbezel' }, frame);
-    const back = h('button', { class: 'btn', type: 'button' }, 'Back to desktop');
+    const back = h('button', { class: 'btn', type: 'button' }, t('chrome.back'));
     back.addEventListener('click', close);
 
-    stage = h('div', { class: 'devstage', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${appName} phone preview` },
+    stage = h('div', { class: 'devstage', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('chrome.stage', { app: appName }) },
       h('div', { class: 'devstage__head' },
         h('div', {},
           h('div', { class: 'devstage__name' }, appName),
-          h('div', { class: 'devstage__sub mono' }, `${FRAME_W} × ${FRAME_H} · live app, real breakpoints`)),
+          h('div', { class: 'devstage__sub mono' }, t('chrome.stageSub', { w: FRAME_W, h: FRAME_H }))),
         back),
       h('div', { class: 'devstage__body' }, bezel));
 

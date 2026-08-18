@@ -12,17 +12,18 @@ import {
   todayKey, addDays, dayLabel, relativeDay, hm12, toMin, toHM, deskNowMin, parseDay,
   freeSlots, freeStaffAt, nextAvailable, isOpenDay, staffWorks, blocksOn,
   svcOf, staffOf, custOf, tokenLabel, createBooking, assignTokens, logEvent,
-  addBlock, gridSlots, STATUS, DOW_LONG, OPEN_STATUSES,
+  addBlock, gridSlots, STATUS, dowLong, OPEN_STATUSES, svcName, staffRole,
 } from './data.js';
 import {
   matchDay, matchService, matchStaff, withStaff, matchCustomer, matchTime,
   snapToGrid, matchBooking, matchWindow, matchNumber, bookingCustomer,
 } from './parse.js';
 import { openToken } from './token.js';
+import { t } from './main.js';
 
 /* ---------- shared shapes ---------- */
-const ask = (text, suggestions) => ({ text, suggestions: suggestions || ACTION_CHIPS, meta: 'nothing changed' });
-const understood = (rows) => ({ head: ['I read this as', ''], rows });
+const ask = (text, suggestions) => ({ text, suggestions: suggestions || actionChips(), meta: t('act.nothingChanged') });
+const understood = (rows) => ({ head: t('act.understood'), rows });
 
 /**
  * The panel awaits whatever run() returns, so the result object must not carry
@@ -32,12 +33,9 @@ const understood = (rows) => ({ head: ['I read this as', ''], rows });
  */
 const andThen = (fn) => { setTimeout(fn, 160); };
 
-export const ACTION_CHIPS = [
-  'What can you do?',
-  'Book Meera for a dental check-up tomorrow at 11',
-  'Call the next token',
-  "Block Nithya's afternoon tomorrow",
-];
+/* Read on demand: `t` comes from main.js, whose body has not run while this
+   module is being evaluated, so the chips cannot be a module-level const. */
+export const actionChips = () => t('act.chips');
 
 /** The slot closest to the one asked for, on that day if possible. */
 function nearestFree(state, key, serviceId, staffId, wantHM, ignoreId) {
@@ -69,18 +67,17 @@ function openDayFrom(state, key) {
 function proposeBook(ctx, q) {
   const state = ctx.state;
   const active = state.services.filter((s) => s.active);
-  if (!active.length) return ask('Every service is switched off in Services, so there is nothing bookable. Turn one back on and ask me again.');
+  if (!active.length) return ask(t('act.book.allOff'));
 
   const who = bookingCustomer(state, q);
   const serviceId = matchService(state, q);
   if (!serviceId) {
-    return ask(`I could not tell which service that is. Name one of: ${active.map((s) => s.name).join(', ')}.`
-      + '\n\nFor example: `book Meera for a dental check-up tomorrow at 11`.');
+    return ask(t('act.book.whichService', { list: active.map((s) => svcName(s)).join(', ') }));
   }
   const svc = svcOf(state, serviceId);
-  if (!svc.active) return ask(`**${svc.name}** is switched off in Services, so I cannot put anything in the diary against it. Switch it back on first.`);
+  if (!svc.active) return ask(t('act.book.serviceOff', { service: svcName(svc) }));
   if (!who.phrase) {
-    return ask(`I have the service — **${svc.name}** — but not who it is for. Put the name in, like \`book Meera Nair for ${svc.name.toLowerCase()} tomorrow at 11\`.`);
+    return ask(t('act.book.whoFor', { service: svcName(svc), lower: svcName(svc).toLowerCase() }));
   }
 
   /* A day that has gone, or a day the desk does not open, is corrected forward
@@ -89,17 +86,25 @@ function proposeBook(ctx, q) {
   const past = asked < todayKey();
   const day = openDayFrom(state, past ? todayKey() : asked);
   const rollNote = past
-    ? `${dayLabel(asked)} has already gone, so I looked at ${relativeDay(day)} instead. `
+    ? t('act.book.rolledPast', { day: dayLabel(asked), to: relativeDay(day) })
     : day !== asked
-      ? `The desk is closed on ${DOW_LONG[parseDay(asked).getDay()]}, so I looked at ${relativeDay(day)} instead. `
+      ? t('act.book.rolledClosed', { day: dowLong(parseDay(asked).getDay()), to: relativeDay(day) })
       : '';
   const staffId = withStaff(state, q);
   if (staffId && !staffOf(state, staffId).skills.includes(serviceId)) {
     const other = state.staff.filter((s) => s.active && s.skills.includes(serviceId)).map((s) => s.name);
-    return ask(`**${staffOf(state, staffId).name}** does not take ${svc.name}. That one is covered by ${other.join(' and ') || 'nobody on the rota'}.`);
+    return ask(t('act.book.wrongSkill', {
+      staff: staffOf(state, staffId).name,
+      service: svcName(svc),
+      others: other.join(t('calendar.and')) || t('act.book.nobodyOnRota'),
+    }));
   }
   if (staffId && !staffWorks(state, staffId, day)) {
-    return ask(`**${staffOf(state, staffId).name}** is not on the rota on ${dayLabel(day)} — they work ${staffOf(state, staffId).days.map((d) => DOW_LONG[d].slice(0, 3)).join(', ')}. Pick another day or leave the name out and I will find whoever is free.`);
+    return ask(t('act.book.notOnRota', {
+      staff: staffOf(state, staffId).name,
+      day: dayLabel(day),
+      days: staffOf(state, staffId).days.map((d) => dowLong(d).slice(0, 3)).join(', '),
+    }));
   }
 
   const wanted = matchTime(state, q);
@@ -112,12 +117,18 @@ function proposeBook(ctx, q) {
   /* No time asked for: propose the first opening rather than guessing. */
   if (!time) {
     const near = nearestFree(state, day, serviceId, staffId, '10:00');
-    if (!near) return ask(`Nothing opens for **${svc.name}**${staffId ? ` with ${staffOf(state, staffId).name}` : ''} in the next three weeks, so I have nothing to offer ${who.phrase}.`);
+    if (!near) {
+      return ask(t('act.book.nothingInThree', {
+        service: svcName(svc),
+        staff: staffId ? staffOf(state, staffId).name : '',
+        who: who.phrase,
+      }));
+    }
     time = near.time;
     ids = near.staffIds;
     return buildBookProposal(ctx, {
       who, serviceId, staffId, day: near.date, time, ids, q,
-      lead: `${rollNote}No time in that, so I took the first opening: **${relativeDay(near.date)} at ${hm12(time)}**.`,
+      lead: t('act.book.firstOpening', { roll: rollNote, day: relativeDay(near.date), time: hm12(time) }),
     });
   }
 
@@ -131,20 +142,38 @@ function proposeBook(ctx, q) {
       && able.includes(b.staffId)
       && toMin(b.time) <= toMin(time) && toMin(b.time) + b.blockMin > toMin(time));
     const why = toMin(time) <= cutoff
-      ? `${rollNote}${hm12(time)} on ${relativeDay(day)} has already gone past on the desk clock.`
+      ? t('act.book.pastClock', { roll: rollNote, time: hm12(time), day: relativeDay(day) })
       : holder
-        ? `${rollNote}${hm12(time)} on ${relativeDay(day)} is taken — ${tokenLabel(state, holder)}, ${custOf(state, holder.customerId).name} with ${staffOf(state, holder.staffId).name}.`
-        : `${rollNote}Nobody with the ${svc.name} skill is free for the whole ${svcBlock(svc)} minute block at ${hm12(time)} on ${relativeDay(day)}.`;
-    if (!near) return ask(`${why}\n\nAnd nothing else opens up in the next three weeks either.`);
+        ? t('act.book.takenBy', {
+          roll: rollNote,
+          time: hm12(time),
+          day: relativeDay(day),
+          token: tokenLabel(state, holder),
+          name: custOf(state, holder.customerId).name,
+          staff: staffOf(state, holder.staffId).name,
+        })
+        : t('act.book.nobodyFree', {
+          roll: rollNote, service: svcName(svc), block: svcBlock(svc), time: hm12(time), day: relativeDay(day),
+        });
+    if (!near) return ask(t('act.book.andNothing', { why }));
     return buildBookProposal(ctx, {
       who, serviceId, staffId, day: near.date, time: near.time, ids: near.staffIds, q,
-      lead: `${why}\n\nThe nearest free one is **${relativeDay(near.date)} at ${hm12(near.time)}**${near.sameDay ? '' : ' — the first opening after that day'}.`,
+      lead: t('act.book.nearest', {
+        why, day: relativeDay(near.date), time: hm12(near.time), sameDay: near.sameDay,
+      }),
     });
   }
 
   return buildBookProposal(ctx, {
     who, serviceId, staffId, day, time, ids, q,
-    lead: `${rollNote}**${hm12(time)} on ${relativeDay(day)}** is open${snapped ? ` (nearest slot on the ${state.settings.slotMinutes} minute grid to ${hm12(wanted)})` : ''}.`,
+    lead: t('act.book.open', {
+      roll: rollNote,
+      time: hm12(time),
+      day: relativeDay(day),
+      snapped,
+      step: state.settings.slotMinutes,
+      wanted: wanted ? hm12(wanted) : '',
+    }),
   });
 }
 
@@ -154,18 +183,24 @@ function buildBookProposal(ctx, o) {
   const taker = o.ids[0];
   const name = o.who.customer ? o.who.customer.name : o.who.phrase;
   return {
-    text: `${o.lead}\n\nI will hold it for **${name}**${o.who.isNew ? ' — a new customer record, since nobody by that name is on file' : ''}.`,
+    text: t('act.book.hold', { lead: o.lead, name, isNew: o.who.isNew }),
     table: understood([
-      ['Customer', o.who.customer ? `${name} · ${o.who.customer.phone}` : `${name} (new)`],
-      ['Service', `${svc.name} · ${svcBlock(svc)} min block · ${state.settings.currency}${svc.priceInr}`],
-      ['Staff', `${staffOf(state, taker).name}${o.staffId ? ' (as asked)' : ' — first free with the skill'}`],
-      ['Day', `${relativeDay(o.day)} · ${dayLabel(o.day)}`],
-      ['Time', `${hm12(o.time)} — ${hm12(toHM(toMin(o.time) + svcBlock(svc)))}`],
+      [t('act.book.rows.customer'), o.who.customer
+        ? t('act.book.customerLine', { name, phone: o.who.customer.phone })
+        : t('act.book.newCustomer', { name })],
+      [t('act.book.rows.service'), t('act.book.serviceLine', {
+        name: svcName(svc), block: svcBlock(svc), price: `${state.settings.currency}${svc.priceInr}`,
+      })],
+      [t('act.book.rows.staff'), `${staffOf(state, taker).name}${o.staffId ? t('act.book.staffAsked') : t('act.book.staffFirstFree')}`],
+      [t('act.book.rows.day'), t('act.book.dayLine', { rel: relativeDay(o.day), day: dayLabel(o.day) })],
+      [t('act.book.rows.time'), t('act.book.timeLine', {
+        from: hm12(o.time), to: hm12(toHM(toMin(o.time) + svcBlock(svc))),
+      })],
     ]),
-    meta: 'nothing written yet',
+    meta: t('act.nothingWritten'),
     actions: [{
-      label: `Book ${hm12(o.time)} on ${relativeDay(o.day)}`,
-      doingLabel: 'Booking…',
+      label: t('act.book.action', { time: hm12(o.time), day: relativeDay(o.day) }),
+      doingLabel: t('act.book.doing'),
       run: () => runBook(ctx, o),
     }],
   };
@@ -177,9 +212,13 @@ function runBook(ctx, o) {
   if (!ids.length) {
     const near = nearestFree(ctx.state, o.day, o.serviceId, o.staffId, o.time);
     return {
-      text: `That slot went while we were talking. Nothing was written.${near ? `\n\nThe nearest free one now is **${relativeDay(near.date)} at ${hm12(near.time)}**.` : ''}`,
-      meta: 'nothing changed',
-      actions: near ? [{ label: `Book ${hm12(near.time)} instead`, doingLabel: 'Booking…', run: () => runBook(ctx, { ...o, day: near.date, time: near.time, ids: near.staffIds }) }] : null,
+      text: t('act.book.wentAway', { nearest: near ? t('bookings.subtitle', { day: relativeDay(near.date), time: hm12(near.time) }) : '' }),
+      meta: t('act.nothingChanged'),
+      actions: near ? [{
+        label: t('act.book.insteadAction', { time: hm12(near.time) }),
+        doingLabel: t('act.book.doing'),
+        run: () => runBook(ctx, { ...o, day: near.date, time: near.time, ids: near.staffIds }),
+      }] : null,
     };
   }
 
@@ -190,7 +229,7 @@ function runBook(ctx, o) {
       customerId = `cus-${Math.random().toString(36).slice(2, 8)}`;
       s.customers.push({
         id: customerId, name: o.who.phrase, phone: '+91 ••••• 0000', email: '',
-        since: todayKey(), tags: [], note: 'Added by the desk agent',
+        since: todayKey(), tags: [], note: t('act.book.agentNote'),
       });
     }
     made = createBooking(s, {
@@ -198,24 +237,30 @@ function runBook(ctx, o) {
       customerId, channel: 'Front desk', note: '',
     });
     const fresh = s.bookings.find((b) => b.id === made.id);
-    if (fresh) logEvent(fresh, 'Booked by the desk agent from a typed request');
+    if (fresh) logEvent(fresh, 'bookedByAgent');
   });
   const rec = ctx.state.bookings.find((b) => b.id === made.id);
   const after = openCount(ctx.state, o.day, o.serviceId, o.staffId);
   const svc = svcOf(ctx.state, o.serviceId);
   return {
-    text: `Booked. **${custOf(ctx.state, customerId).name}** has ${svc.name} on **${dayLabel(o.day)} at ${hm12(o.time)}** with ${staffOf(ctx.state, ids[0]).name}.`,
+    text: t('act.book.done', {
+      name: custOf(ctx.state, customerId).name,
+      service: svcName(svc),
+      day: dayLabel(o.day),
+      time: hm12(o.time),
+      staff: staffOf(ctx.state, ids[0]).name,
+    }),
     table: {
-      head: ['', 'Before', 'After'],
+      head: t('act.beforeAfter'),
       rows: [
-        ['That slot', 'open', `**${tokenLabel(ctx.state, rec)}** · ${rec.ref}`],
-        [`Free ${svc.code} slots on ${relativeDay(o.day)}`, String(before), String(after)],
-        ['On the day sheet', String(ctx.state.bookings.filter((b) => b.date === o.day && b.status !== 'cancelled').length - 1), String(ctx.state.bookings.filter((b) => b.date === o.day && b.status !== 'cancelled').length)],
+        [t('act.book.rowSlot'), t('act.book.rowSlotOpen'), `**${tokenLabel(ctx.state, rec)}** · ${rec.ref}`],
+        [t('act.book.rowFree', { code: svc.code, day: relativeDay(o.day) }), String(before), String(after)],
+        [t('act.book.rowSheet'), String(ctx.state.bookings.filter((b) => b.date === o.day && b.status !== 'cancelled').length - 1), String(ctx.state.bookings.filter((b) => b.date === o.day && b.status !== 'cancelled').length)],
       ],
     },
-    meta: `${rec.ref} written · showing on Today and the calendar`,
-    suggestions: ["Today's load", 'Free slots tomorrow', 'What can you do?'],
-    queued: andThen(() => openToken(ctx, rec, { title: 'Booked' })),
+    meta: t('act.book.meta', { ref: rec.ref }),
+    suggestions: [t('ans.chips.todayLoad'), t('ans.chips.freeTomorrow'), t('ans.chips.whatCanYouDo')],
+    queued: andThen(() => openToken(ctx, rec, { title: t('dialog.bookedTitle') })),
   };
 }
 
@@ -226,26 +271,26 @@ function proposeMove(ctx, q) {
   const state = ctx.state;
   const found = matchBooking(state, q);
   if (!found.booking && !found.list.length) {
-    return ask('I could not tell which booking to move. Give me the reference, the token or the customer name — `move SL-1042 to Thursday at 11` or `reschedule Meera to tomorrow 3pm`.');
+    return ask(t('act.move.which'));
   }
   if (!found.booking && found.list.length > 1) {
     return {
-      text: `**${found.label}** has ${found.list.length} bookings still open, so I will not guess which one to move. Pick one.`,
+      text: t('act.move.several', { name: found.label, n: found.list.length }),
       table: {
-        head: ['Ref', 'When', 'Service'],
-        rows: found.list.slice(0, 5).map((b) => [b.ref, `${relativeDay(b.date)} ${hm12(b.time)}`, svcOf(state, b.serviceId).name]),
+        head: t('act.move.cols'),
+        rows: found.list.slice(0, 5).map((b) => [b.ref, `${relativeDay(b.date)} ${hm12(b.time)}`, svcName(svcOf(state, b.serviceId))]),
       },
-      meta: 'nothing changed',
+      meta: t('act.nothingChanged'),
       actions: found.list.slice(0, 3).map((b) => ({
-        label: `${b.ref} · ${relativeDay(b.date)} ${hm12(b.time)}`,
-        doingLabel: 'Reading…',
+        label: t('act.move.pickAction', { ref: b.ref, day: relativeDay(b.date), time: hm12(b.time) }),
+        doingLabel: t('act.move.reading'),
         run: () => moveTarget(ctx, b, q),
       })),
     };
   }
   const target = found.booking || found.list[0];
   if (!OPEN_STATUSES.includes(target.status)) {
-    return ask(`**${target.ref}** is already ${(STATUS[target.status] || {}).label.toLowerCase()}, so there is nothing to move.`);
+    return ask(t('act.move.alreadyDone', { ref: target.ref, status: (STATUS[target.status] || {}).label }));
   }
   return moveTarget(ctx, target, q);
 }
@@ -267,18 +312,29 @@ function moveTarget(ctx, target, q) {
   let lead;
   if (!time) {
     const near = nearestFree(state, day, target.serviceId, pinned, target.time, target.id);
-    if (!near) return ask(`Nothing is open for **${svc.name}** on ${relativeDay(day)} or in the three weeks after it, so **${target.ref}** has nowhere to go.`);
+    if (!near) return ask(t('act.move.nowhere', { service: svcName(svc), day: relativeDay(day), ref: target.ref }));
     time = near.time; ids = near.staffIds;
-    lead = `No time in that, so I took the first opening on ${relativeDay(near.date)}: **${hm12(time)}**.`;
+    lead = t('act.move.firstOpening', { day: relativeDay(near.date), time: hm12(time) });
     return buildMoveProposal(ctx, target, { day: near.date, time, ids, lead });
   }
   if (!ids.length) {
     const near = nearestFree(state, day, target.serviceId, pinned, time, target.id);
-    if (!near) return ask(`${hm12(time)} on ${relativeDay(day)} is not free, and nothing else opens for ${svc.name} in the next three weeks. **${target.ref}** stays where it is.`);
-    lead = `**${hm12(time)} on ${relativeDay(day)}** is not free for a ${svcBlock(svc)} minute ${svc.name}. The nearest one that is: **${relativeDay(near.date)} at ${hm12(near.time)}**.`;
+    if (!near) {
+      return ask(t('act.move.staysPut', {
+        time: hm12(time), day: relativeDay(day), service: svcName(svc), ref: target.ref,
+      }));
+    }
+    lead = t('act.move.nearest', {
+      time: hm12(time),
+      day: relativeDay(day),
+      block: svcBlock(svc),
+      service: svcName(svc),
+      nearDay: relativeDay(near.date),
+      nearTime: hm12(near.time),
+    });
     return buildMoveProposal(ctx, target, { day: near.date, time: near.time, ids: near.staffIds, lead });
   }
-  lead = `**${hm12(time)} on ${relativeDay(day)}** is open and holds the full ${svcBlock(svc)} minutes.`;
+  lead = t('act.move.fits', { time: hm12(time), day: relativeDay(day), block: svcBlock(svc) });
   return buildMoveProposal(ctx, target, { day, time, ids, lead });
 }
 
@@ -286,17 +342,23 @@ function buildMoveProposal(ctx, target, o) {
   const state = ctx.state;
   const cust = custOf(state, target.customerId);
   return {
-    text: `${o.lead}\n\nMoving **${target.ref}** for ${cust.name}.`,
+    text: t('act.move.moving', { lead: o.lead, ref: target.ref, name: cust.name }),
     table: understood([
-      ['Booking', `${target.ref} · ${tokenLabel(state, target)} · ${cust.name}`],
-      ['Service', svcOf(state, target.serviceId).name],
-      ['From', `${dayLabel(target.date)} ${hm12(target.time)} · ${staffOf(state, target.staffId).name}`],
-      ['To', `${dayLabel(o.day)} ${hm12(o.time)} · ${staffOf(state, o.ids[0]).name}`],
+      [t('act.move.rows.booking'), t('act.move.bookingLine', {
+        ref: target.ref, token: tokenLabel(state, target), name: cust.name,
+      })],
+      [t('act.move.rows.service'), svcName(svcOf(state, target.serviceId))],
+      [t('act.move.rows.from'), t('act.move.whenLine', {
+        day: dayLabel(target.date), time: hm12(target.time), staff: staffOf(state, target.staffId).name,
+      })],
+      [t('act.move.rows.to'), t('act.move.whenLine', {
+        day: dayLabel(o.day), time: hm12(o.time), staff: staffOf(state, o.ids[0]).name,
+      })],
     ]),
-    meta: 'nothing written yet',
+    meta: t('act.nothingWritten'),
     actions: [{
-      label: `Move to ${relativeDay(o.day)} ${hm12(o.time)}`,
-      doingLabel: 'Moving…',
+      label: t('act.move.action', { day: relativeDay(o.day), time: hm12(o.time) }),
+      doingLabel: t('act.move.doing'),
       run: () => runMove(ctx, target, o),
     }],
   };
@@ -308,7 +370,12 @@ function runMove(ctx, target, o) {
     token: tokenLabel(ctx.state, ctx.state.bookings.find((b) => b.id === target.id) || target),
   };
   const ids = freeStaffAt(ctx.state, o.day, o.time, target.serviceId, target.id).filter((id) => o.ids.includes(id));
-  if (!ids.length) return { text: `${hm12(o.time)} on ${relativeDay(o.day)} filled up while we were talking. **${target.ref}** has not been moved.`, meta: 'nothing changed' };
+  if (!ids.length) {
+    return {
+      text: t('act.move.filled', { time: hm12(o.time), day: relativeDay(o.day), ref: target.ref }),
+      meta: t('act.nothingChanged'),
+    };
+  }
 
   ctx.store.update((s) => {
     const b = s.bookings.find((x) => x.id === target.id);
@@ -316,23 +383,30 @@ function runMove(ctx, target, o) {
     b.date = o.day;
     b.time = o.time;
     b.staffId = ids[0];
-    logEvent(b, `Moved from ${dayLabel(before.date)} ${hm12(before.time)} to ${dayLabel(o.day)} ${hm12(o.time)} by the desk agent`);
+    logEvent(b, 'movedByAgent', {
+      fromDay: dayLabel(before.date),
+      fromTime: hm12(before.time),
+      toDay: dayLabel(o.day),
+      toTime: hm12(o.time),
+    });
     assignTokens(s.bookings);
   });
   const rec = ctx.state.bookings.find((b) => b.id === target.id);
   return {
-    text: `Moved. **${target.ref}** now sits on **${dayLabel(o.day)} at ${hm12(o.time)}** with ${staffOf(ctx.state, ids[0]).name}. The old slot is back on the grid.`,
+    text: t('act.move.done', {
+      ref: target.ref, day: dayLabel(o.day), time: hm12(o.time), staff: staffOf(ctx.state, ids[0]).name,
+    }),
     table: {
-      head: ['', 'Before', 'After'],
+      head: t('act.beforeAfter'),
       rows: [
-        ['When', `${dayLabel(before.date)} ${hm12(before.time)}`, `${dayLabel(o.day)} ${hm12(o.time)}`],
-        ['Staff', staffOf(ctx.state, before.staffId).name, staffOf(ctx.state, ids[0]).name],
-        ['Token', before.token, tokenLabel(ctx.state, rec)],
+        [t('act.move.rowWhen'), `${dayLabel(before.date)} ${hm12(before.time)}`, `${dayLabel(o.day)} ${hm12(o.time)}`],
+        [t('act.move.rowStaff'), staffOf(ctx.state, before.staffId).name, staffOf(ctx.state, ids[0]).name],
+        [t('act.move.rowToken'), before.token, tokenLabel(ctx.state, rec)],
       ],
     },
-    meta: `${target.ref} updated · the calendar and Today already show it`,
-    suggestions: ['Free slots tomorrow', "Today's load", 'What can you do?'],
-    queued: andThen(() => openToken(ctx, rec, { title: 'Moved' })),
+    meta: t('act.move.meta', { ref: target.ref }),
+    suggestions: [t('ans.chips.freeTomorrow'), t('ans.chips.todayLoad'), t('ans.chips.whatCanYouDo')],
+    queued: andThen(() => openToken(ctx, rec, { title: t('dialog.movedTitle') })),
   };
 }
 
@@ -349,38 +423,47 @@ function proposeCancel(ctx, q) {
   const state = ctx.state;
   const found = matchBooking(state, q);
   if (!found.booking && !found.list.length) {
-    return ask('I could not tell which booking to cancel. Name it — `cancel SL-1042 because the customer is unwell`.');
+    return ask(t('act.cancel.which'));
   }
   if (!found.booking && found.list.length > 1) {
     return {
-      text: `**${found.label}** has ${found.list.length} open bookings. I will not cancel on a guess — pick the one you mean.`,
-      table: { head: ['Ref', 'When', 'Service'], rows: found.list.slice(0, 5).map((b) => [b.ref, `${relativeDay(b.date)} ${hm12(b.time)}`, svcOf(state, b.serviceId).name]) },
-      meta: 'nothing changed',
+      text: t('act.cancel.several', { name: found.label, n: found.list.length }),
+      table: {
+        head: t('act.cancel.cols'),
+        rows: found.list.slice(0, 5).map((b) => [b.ref, `${relativeDay(b.date)} ${hm12(b.time)}`, svcName(svcOf(state, b.serviceId))]),
+      },
+      meta: t('act.nothingChanged'),
       actions: found.list.slice(0, 3).map((b) => ({
-        label: `Cancel ${b.ref}`,
-        doingLabel: 'Cancelling…',
-        run: () => runCancel(ctx, b, readReason(q) || 'Cancelled at the front desk'),
+        label: t('act.cancel.pickAction', { ref: b.ref }),
+        doingLabel: t('act.cancel.doing'),
+        run: () => runCancel(ctx, b, readReason(q) || t('act.cancel.defaultReason')),
       })),
     };
   }
   const target = found.booking || found.list[0];
-  if (target.status === 'cancelled') return ask(`**${target.ref}** is already cancelled — nothing to do.`);
+  if (target.status === 'cancelled') return ask(t('act.cancel.already', { ref: target.ref }));
   const cust = custOf(state, target.customerId);
   const reason = readReason(q);
   return {
     text: reason
-      ? `Ready to cancel **${target.ref}** and log the reason against it.`
-      : `Ready to cancel **${target.ref}**, but you have not given me a reason and the record keeps one. Add it — \`cancel ${target.ref} because the customer is unwell\` — or press through without one.`,
+      ? t('act.cancel.ready', { ref: target.ref })
+      : t('act.cancel.needReason', { ref: target.ref }),
     table: understood([
-      ['Booking', `${target.ref} · ${tokenLabel(state, target)}`],
-      ['Customer', `${cust.name} · ${cust.phone}`],
-      ['When', `${dayLabel(target.date)} ${hm12(target.time)} · ${staffOf(state, target.staffId).name}`],
-      ['Reason', reason || 'none given'],
-      ['Effect', `${target.blockMin} minutes go back on the grid`],
+      [t('act.cancel.rows.booking'), t('act.cancel.bookingLine', { ref: target.ref, token: tokenLabel(state, target) })],
+      [t('act.cancel.rows.customer'), t('act.cancel.customerLine', { name: cust.name, phone: cust.phone })],
+      [t('act.cancel.rows.when'), t('act.cancel.whenLine', {
+        day: dayLabel(target.date), time: hm12(target.time), staff: staffOf(state, target.staffId).name,
+      })],
+      [t('act.cancel.rows.reason'), reason || t('act.cancel.noReason')],
+      [t('act.cancel.rows.effect'), t('act.cancel.effect', { n: target.blockMin })],
     ]),
-    meta: 'nothing written yet',
+    meta: t('act.nothingWritten'),
     actions: [
-      { label: reason ? 'Cancel it' : 'Cancel without a reason', doingLabel: 'Cancelling…', run: () => runCancel(ctx, target, reason || 'Cancelled at the front desk, no reason recorded') },
+      {
+        label: reason ? t('act.cancel.action') : t('act.cancel.actionNoReason'),
+        doingLabel: t('act.cancel.doing'),
+        run: () => runCancel(ctx, target, reason || t('act.cancel.noReasonRecorded')),
+      },
     ],
   };
 }
@@ -388,7 +471,7 @@ function proposeCancel(ctx, q) {
 function runCancel(ctx, target, reason) {
   const state = ctx.state;
   const rec = state.bookings.find((b) => b.id === target.id);
-  if (!rec) return { text: 'That record is no longer in the store, so nothing was changed.', meta: 'nothing changed' };
+  if (!rec) return { text: t('act.cancel.gone'), meta: t('act.nothingChanged') };
   const beforeStatus = (STATUS[rec.status] || {}).label || rec.status;
   const beforeFree = openCount(state, rec.date, rec.serviceId, null);
   ctx.store.update((s) => {
@@ -396,20 +479,25 @@ function runCancel(ctx, target, reason) {
     if (!b) return;
     b.status = 'cancelled';
     b.note = b.note ? `${b.note} · ${reason}` : reason;
-    logEvent(b, `Cancelled by the desk agent — ${reason}`);
+    logEvent(b, 'cancelledByAgent', { reason });
   });
   return {
-    text: `Cancelled. **${rec.ref}** for ${custOf(ctx.state, rec.customerId).name} on ${dayLabel(rec.date)} at ${hm12(rec.time)} is off the sheet, and the reason is on the record.`,
+    text: t('act.cancel.done', {
+      ref: rec.ref,
+      name: custOf(ctx.state, rec.customerId).name,
+      day: dayLabel(rec.date),
+      time: hm12(rec.time),
+    }),
     table: {
-      head: ['', 'Before', 'After'],
+      head: t('act.beforeAfter'),
       rows: [
-        ['Status', beforeStatus, '**Cancelled**'],
-        ['Reason on file', '—', reason],
-        [`Free slots on ${relativeDay(rec.date)}`, String(beforeFree), String(openCount(ctx.state, rec.date, rec.serviceId, null))],
+        [t('act.cancel.rowStatus'), beforeStatus, t('act.cancel.rowCancelled')],
+        [t('act.cancel.rowReason'), t('common.none'), reason],
+        [t('act.cancel.rowFree', { day: relativeDay(rec.date) }), String(beforeFree), String(openCount(ctx.state, rec.date, rec.serviceId, null))],
       ],
     },
-    meta: `${rec.ref} released · Today and the calendar are already updated`,
-    suggestions: ['Cancellations this week', "Today's load", 'What can you do?'],
+    meta: t('act.cancel.meta', { ref: rec.ref }),
+    suggestions: [t('ans.chips.cancellations'), t('ans.chips.todayLoad'), t('ans.chips.whatCanYouDo')],
   };
 }
 
@@ -441,30 +529,47 @@ function proposeQueue(ctx, q) {
         : waiting[0];
 
   if (!target) {
-    return ask(`Nothing on today's sheet matches that. ${day.length ? `There are ${day.length} bookings today, ${waiting.length} still waiting.` : 'Today has no bookings at all.'}`);
+    return ask(t('act.queue.nothingMatches', {
+      tail: day.length
+        ? t('act.queue.tailSome', { n: day.length, waiting: waiting.length })
+        : t('act.queue.tailNone'),
+    }));
   }
   if (!OPEN_STATUSES.includes(target.status)) {
-    return ask(`**${tokenLabel(state, target)}** is already ${(STATUS[target.status] || {}).label.toLowerCase()}. Pick another token, or ask me for the queue.`);
+    return ask(t('act.queue.already', {
+      token: tokenLabel(state, target), status: (STATUS[target.status] || {}).label,
+    }));
   }
 
   const next = wantNoShow ? 'no-show' : wantDone ? 'done' : wantStart ? 'serving' : 'called';
-  const verb = { called: 'Call', serving: 'Seat', done: 'Mark served', 'no-show': 'Mark no-show' }[next];
+  const verb = t(`act.queue.verb.${next}`);
   const cust = custOf(state, target.customerId);
   return {
-    text: `${verb === 'Call' ? 'Next in line is' : 'That is'} **${tokenLabel(state, target)}** — ${cust.name}, ${svcOf(state, target.serviceId).name} with ${staffOf(state, target.staffId).name} at ${hm12(target.time)}.`
-      + (next === 'no-show' ? `\n\nMarking it a no-show puts ${target.blockMin} minutes back on the grid and counts against this customer's record.` : ''),
+    text: t('act.queue.text', {
+      opener: next === 'called' ? t('act.queue.nextInLine') : t('act.queue.thatIs'),
+      token: tokenLabel(state, target),
+      name: cust.name,
+      service: svcName(svcOf(state, target.serviceId)),
+      staff: staffOf(state, target.staffId).name,
+      time: hm12(target.time),
+    })
+      + (next === 'no-show' ? t('act.queue.noShowNote', { n: target.blockMin }) : ''),
     table: understood([
-      ['Token', `${tokenLabel(state, target)} · ${target.ref}`],
-      ['Customer', `${cust.name}${next === 'no-show' ? '' : ''}`],
-      ['Now', (STATUS[target.status] || {}).label],
-      ['Change to', (STATUS[next] || {}).label],
-      ['Still waiting', `${waiting.length} token${waiting.length === 1 ? '' : 's'}`],
+      [t('act.queue.rows.token'), t('act.queue.tokenLine', { token: tokenLabel(state, target), ref: target.ref })],
+      [t('act.queue.rows.customer'), `${cust.name}${next === 'no-show' ? '' : ''}`],
+      [t('act.queue.rows.now'), (STATUS[target.status] || {}).label],
+      [t('act.queue.rows.changeTo'), (STATUS[next] || {}).label],
+      [t('act.queue.rows.waiting'), t('act.queue.waitingLine', { n: waiting.length })],
     ]),
-    meta: 'nothing written yet',
+    meta: t('act.nothingWritten'),
     actions: [
-      { label: `${verb} ${tokenLabel(state, target)}`, doingLabel: 'Updating…', run: () => runQueue(ctx, target, next) },
+      {
+        label: t('act.queue.action', { verb, token: tokenLabel(state, target) }),
+        doingLabel: t('act.queue.doing'),
+        run: () => runQueue(ctx, target, next),
+      },
       next !== 'no-show' && next !== 'done'
-        ? { label: 'Mark it a no-show instead', doingLabel: 'Updating…', run: () => runQueue(ctx, target, 'no-show') }
+        ? { label: t('act.queue.noShowInstead'), doingLabel: t('act.queue.doing'), run: () => runQueue(ctx, target, 'no-show') }
         : null,
     ].filter(Boolean),
   };
@@ -473,7 +578,7 @@ function proposeQueue(ctx, q) {
 function runQueue(ctx, target, next) {
   const state = ctx.state;
   const rec = state.bookings.find((b) => b.id === target.id);
-  if (!rec) return { text: 'That token is no longer on today\'s sheet.', meta: 'nothing changed' };
+  if (!rec) return { text: t('act.queue.gone'), meta: t('act.nothingChanged') };
   const before = (STATUS[rec.status] || {}).label || rec.status;
   const label = tokenLabel(state, rec);
   const beforeDay = todayLive(state);
@@ -483,28 +588,39 @@ function runQueue(ctx, target, next) {
     const b = s.bookings.find((x) => x.id === target.id);
     if (!b) return;
     b.status = next;
-    logEvent(b, {
-      called: 'Called to the desk by the agent',
-      serving: 'Seated by the agent',
-      done: 'Marked served by the agent',
-      'no-show': 'Marked a no-show by the agent',
-    }[next] || `Marked ${next}`);
+    const key = {
+      called: 'calledByAgent',
+      serving: 'seatedByAgent',
+      done: 'servedByAgent',
+      'no-show': 'noShowByAgent',
+    }[next];
+    if (key) logEvent(b, key);
+    else logEvent(b, 'marked', { status: next });
   });
   const day = todayLive(ctx.state);
   const waiting = day.filter((b) => b.status === 'booked' || b.status === 'called');
   const nowServing = day.find((b) => b.status === 'serving');
   return {
-    text: `**${label}** is now ${(STATUS[next] || {}).label.toLowerCase()}. ${nowServing ? `At the chair: ${tokenLabel(ctx.state, nowServing)} — ${custOf(ctx.state, nowServing.customerId).name}.` : 'Nobody is at the chair.'}`,
+    text: t('act.queue.done', {
+      token: label,
+      status: (STATUS[next] || {}).label,
+      chair: nowServing
+        ? t('act.queue.atChair', {
+          token: tokenLabel(ctx.state, nowServing),
+          name: custOf(ctx.state, nowServing.customerId).name,
+        })
+        : t('act.queue.nobodyAtChair'),
+    }),
     table: {
-      head: ['', 'Before', 'After'],
+      head: t('act.beforeAfter'),
       rows: [
         [label, before, `**${(STATUS[next] || {}).label}**`],
-        ['Waiting', String(beforeWaiting), String(waiting.length)],
-        ['Served today', String(beforeDone), String(day.filter((b) => b.status === 'done').length)],
+        [t('act.queue.rowWaiting'), String(beforeWaiting), String(waiting.length)],
+        [t('act.queue.rowServed'), String(beforeDone), String(day.filter((b) => b.status === 'done').length)],
       ],
     },
-    meta: 'Today is already redrawn',
-    suggestions: ['Call the next token', 'Queue right now', "Today's load"],
+    meta: t('act.queue.meta'),
+    suggestions: [t('ans.chips.callNext'), t('ans.chips.queueNow'), t('ans.chips.todayLoad')],
   };
 }
 
@@ -514,16 +630,21 @@ function runQueue(ctx, target, next) {
 function proposeBlock(ctx, q) {
   const state = ctx.state;
   const staffId = matchStaff(state, q);
-  if (!staffId) return ask(`Name the person — \`block Nithya's afternoon tomorrow\`. On the rota: ${state.staff.map((s) => s.name).join(', ')}.`);
+  if (!staffId) return ask(t('act.block.whoFor', { list: state.staff.map((s) => s.name).join(', ') }));
   const st = staffOf(state, staffId);
   const asked = matchDay(q) || todayKey();
   const day = asked;
   if (!staffWorks(state, staffId, day)) {
-    return ask(`**${st.name}** is not on shift on ${dayLabel(day)} anyway — they work ${st.days.map((d) => DOW_LONG[d].slice(0, 3)).join(', ')}${isOpenDay(state, day) ? '' : ', and the desk is closed that day'}. Nothing to hold back.`);
+    return ask(t('act.block.notOnShift', {
+      staff: st.name,
+      day: dayLabel(day),
+      days: st.days.map((d) => dowLong(d).slice(0, 3)).join(', '),
+      closed: !isOpenDay(state, day),
+    }));
   }
   const win = matchWindow(state, q, staffId, day, deskNowMin(state.settings));
   if (!win) {
-    return ask(`I have **${st.name}** on ${relativeDay(day)}, but not which part of the day. Say \`morning\`, \`afternoon\`, \`all day\`, or a range like \`from 2 to 5\`.`);
+    return ask(t('act.block.whichPart', { staff: st.name, day: relativeDay(day) }));
   }
 
   const s = toMin(win.start);
@@ -535,32 +656,34 @@ function proposeBlock(ctx, q) {
 
   if (clash.length) {
     return {
-      text: `**${st.name}** has ${clash.length} booking${clash.length === 1 ? '' : 's'} inside ${win.label} on ${relativeDay(day)}, so I will not block over ${clash.length === 1 ? 'it' : 'them'} without being told to.`,
+      text: t('act.block.clash', {
+        staff: st.name, n: clash.length, window: win.label, day: relativeDay(day),
+      }),
       table: {
-        head: ['Token', 'Time', 'Customer'],
+        head: t('act.block.cols'),
         rows: clash.map((b) => [tokenLabel(state, b), hm12(b.time), custOf(state, b.customerId).name]),
       },
-      meta: 'nothing written yet',
+      meta: t('act.nothingWritten'),
       actions: [
-        { label: 'Block the free time only', doingLabel: 'Holding…', run: () => runBlock(ctx, { staffId, day, start: win.start, end: win.end, label: win.label, around: clash.map((b) => b.id) }) },
-        { label: `Cancel ${clash.length === 1 ? 'it' : `all ${clash.length}`} and block it all`, doingLabel: 'Holding…', run: () => runBlock(ctx, { staffId, day, start: win.start, end: win.end, label: win.label, cancel: clash.map((b) => b.id) }) },
+        { label: t('act.block.freeOnly'), doingLabel: t('act.block.doing'), run: () => runBlock(ctx, { staffId, day, start: win.start, end: win.end, label: win.label, around: clash.map((b) => b.id) }) },
+        { label: t('act.block.cancelAll', { n: clash.length }), doingLabel: t('act.block.doing'), run: () => runBlock(ctx, { staffId, day, start: win.start, end: win.end, label: win.label, cancel: clash.map((b) => b.id) }) },
       ],
     };
   }
 
   return {
-    text: `${win.label.replace(/^t/, 'T')} is clear for **${st.name}** on ${relativeDay(day)}, so I can hold it back with nothing to move.`,
+    text: t('act.block.clear', { window: win.label, staff: st.name, day: relativeDay(day) }),
     table: understood([
-      ['Staff', `${st.name} · ${st.role}`],
-      ['Day', `${relativeDay(day)} · ${dayLabel(day)}`],
-      ['Window', `${hm12(win.start)} to ${hm12(win.end)} · ${e - s} minutes`],
-      ['Bookings hit', 'none'],
-      ['Effect', 'those slots stop showing as bookable on the calendar'],
+      [t('act.block.rows.staff'), t('act.block.staffLine', { name: st.name, role: staffRole(st) })],
+      [t('act.block.rows.day'), t('act.block.dayLine', { rel: relativeDay(day), day: dayLabel(day) })],
+      [t('act.block.rows.window'), t('act.block.windowLine', { from: hm12(win.start), to: hm12(win.end), mins: e - s })],
+      [t('act.block.rows.hits'), t('act.block.noneHit')],
+      [t('act.block.rows.effect'), t('act.block.effect')],
     ]),
-    meta: 'nothing written yet',
+    meta: t('act.nothingWritten'),
     actions: [{
-      label: `Block ${hm12(win.start)}–${hm12(win.end)}`,
-      doingLabel: 'Holding…',
+      label: t('act.block.action', { from: hm12(win.start), to: hm12(win.end) }),
+      doingLabel: t('act.block.doing'),
       run: () => runBlock(ctx, { staffId, day, start: win.start, end: win.end, label: win.label }),
     }],
   };
@@ -579,7 +702,7 @@ function runBlock(ctx, o) {
         const b = s.bookings.find((x) => x.id === id);
         if (!b) continue;
         b.status = 'cancelled';
-        logEvent(b, `Cancelled to hold ${o.label} for ${st.name}`);
+        logEvent(b, 'cancelledForBlock', { label: o.label, staff: st.name });
         cancelled.push(b.ref);
       }
     }
@@ -602,25 +725,29 @@ function runBlock(ctx, o) {
     }
     for (const [ps, pe] of pieces) {
       if (pe - ps < 5) continue;
-      addBlock(s, { staffId: o.staffId, date: o.day, start: toHM(ps), end: toHM(pe), reason: `Held back — ${o.label}` });
+      addBlock(s, { staffId: o.staffId, date: o.day, start: toHM(ps), end: toHM(pe), reason: t('act.block.reason', { label: o.label }) });
     }
   });
 
   const held = blocksOn(ctx.state, o.staffId, o.day);
   const mins = held.reduce((n, x) => n + (toMin(x.end) - toMin(x.start)), 0);
   return {
-    text: `Held. **${st.name}** is off the grid for ${held.map((x) => `${hm12(x.start)}–${hm12(x.end)}`).join(', ')} on ${dayLabel(o.day)}.`
-      + (cancelled.length ? `\n\nCancelled to make room: ${cancelled.join(', ')}.` : ''),
+    text: t('act.block.done', {
+      staff: st.name,
+      windows: held.map((x) => `${hm12(x.start)}–${hm12(x.end)}`).join(', '),
+      day: dayLabel(o.day),
+    })
+      + (cancelled.length ? t('act.block.cancelledToo', { refs: cancelled.join(', ') }) : ''),
     table: {
-      head: ['', 'Before', 'After'],
+      head: t('act.beforeAfter'),
       rows: [
-        [`Bookable ${svcOf(ctx.state, skill).code} slots`, String(before), String(openCount(ctx.state, o.day, skill, o.staffId))],
-        ['Time held back', '0 min', `${mins} min`],
-        ['Bookings cancelled', '0', String(cancelled.length)],
+        [t('act.block.rowBookable', { code: svcOf(ctx.state, skill).code }), String(before), String(openCount(ctx.state, o.day, skill, o.staffId))],
+        [t('act.block.rowHeld'), t('act.block.zeroMin'), t('act.block.mins', { n: mins })],
+        [t('act.block.rowCancelled'), '0', String(cancelled.length)],
       ],
     },
-    meta: 'the calendar shows the held slots as unavailable',
-    suggestions: ['Free slots tomorrow', 'Staff workload', 'What can you do?'],
+    meta: t('act.block.meta'),
+    suggestions: [t('ans.chips.freeTomorrow'), t('ans.chips.staffWorkload'), t('ans.chips.whatCanYouDo')],
   };
 }
 
@@ -630,7 +757,7 @@ function runBlock(ctx, o) {
 function proposeService(ctx, q) {
   const state = ctx.state;
   const serviceId = matchService(state, q);
-  if (!serviceId) return ask(`Which service? ${state.services.map((s) => s.name).join(', ')}. For example: \`make the dental cleaning 30 minutes\`.`);
+  if (!serviceId) return ask(t('act.service.which', { list: state.services.map((s) => svcName(s)).join(', ') }));
   const svc = svcOf(state, serviceId);
   const text = String(q).toLowerCase();
 
@@ -639,7 +766,7 @@ function proposeService(ctx, q) {
   const wantsBuffer = /\bbuffer\b/.test(text);
 
   let field = wantsPrice && !wantsMinutes ? 'price' : wantsMinutes ? (wantsBuffer ? 'buffer' : 'duration') : null;
-  if (!field) return ask(`I can change a service's duration, its buffer or its price. Say which — \`set the physiotherapy price to 1200\` or \`make the dental cleaning 30 minutes\`.`);
+  if (!field) return ask(t('act.service.whichField'));
 
   let value = field === 'price'
     ? (matchNumber(q, '\\bto\\b') ?? matchNumber(q, '\\b(?:price|cost|charge|fee|rs|rupees)\\b|₹') ?? matchNumber(q))
@@ -648,33 +775,49 @@ function proposeService(ctx, q) {
     const m = text.match(/(\d{1,3})\s*(?:min|mins|minutes)/);
     if (m) value = Number(m[1]);
   }
-  if (!value || value <= 0) return ask(`I have **${svc.name}** and that you want the ${field} changed, but no number in the sentence. Add one — \`${field === 'price' ? `set ${svc.name.toLowerCase()} price to 1200` : `make ${svc.name.toLowerCase()} 30 minutes`}\`.`);
-  if (field !== 'price' && value > 240) return ask(`${value} minutes is longer than any shift on the rota. Give me something under 240.`);
-  if (field === 'price' && value > 100000) return ask(`${state.settings.currency}${value} looks like a typo rather than a price. Give me a figure under 100,000.`);
+  if (!value || value <= 0) {
+    return ask(t('act.service.noNumber', {
+      service: svcName(svc),
+      field: t(`act.service.fieldNames.${field}`),
+      example: field === 'price'
+        ? t('act.service.exPrice', { lower: svcName(svc).toLowerCase() })
+        : t('act.service.exMinutes', { lower: svcName(svc).toLowerCase() }),
+    }));
+  }
+  if (field !== 'price' && value > 240) return ask(t('act.service.tooLong', { n: value }));
+  if (field === 'price' && value > 100000) return ask(t('act.service.tooDear', { price: `${state.settings.currency}${value}` }));
 
   const before = { duration: svc.durationMin, buffer: svc.bufferMin, price: svc.priceInr };
   const after = { ...before, [field]: value };
-  if (before[field] === value) return ask(`**${svc.name}** is already at ${field === 'price' ? `${state.settings.currency}${value}` : `${value} minutes`}. Nothing to change.`);
+  if (before[field] === value) {
+    return ask(t('act.service.already', {
+      service: svcName(svc),
+      value: field === 'price' ? `${state.settings.currency}${value}` : t('act.service.minutes', { n: value }),
+    }));
+  }
 
   const newBlock = after.duration + after.buffer;
   const future = state.bookings.filter((b) => b.serviceId === serviceId && OPEN_STATUSES.includes(b.status) && b.date >= todayKey());
 
   return {
-    text: `Changing the ${field} of **${svc.name}**.`
+    text: t('act.service.changing', { field: t(`act.service.fieldNames.${field}`), service: svcName(svc) })
       + (field === 'price'
-        ? `\n\nExisting bookings are priced from the service, so the ${future.length} still on the book will bill at the new figure.`
-        : `\n\nThe booked block goes from ${before.duration + before.buffer} to ${newBlock} minutes. I will retime the ${future.length} future booking${future.length === 1 ? '' : 's'} that still fit, and leave any that would collide on the old block.`),
+        ? t('act.service.priceNote', { n: future.length })
+        : t('act.service.blockNote', { from: before.duration + before.buffer, to: newBlock, n: future.length })),
     table: understood([
-      ['Service', `${svc.name} · ${svc.code}`],
-      ['Field', field === 'price' ? 'Price' : field === 'buffer' ? 'Buffer' : 'Duration'],
-      ['Before', field === 'price' ? `${state.settings.currency}${before.price}` : `${before[field]} min`],
-      ['After', field === 'price' ? `${state.settings.currency}${value}` : `${value} min`],
-      ['Bookings affected', String(future.length)],
+      [t('act.service.rows.service'), t('act.service.serviceLine', { name: svcName(svc), code: svc.code })],
+      [t('act.service.rows.field'), t(`act.service.fieldLabels.${field}`)],
+      [t('act.service.rows.before'), field === 'price' ? `${state.settings.currency}${before.price}` : t('act.service.minutes', { n: before[field] })],
+      [t('act.service.rows.after'), field === 'price' ? `${state.settings.currency}${value}` : t('act.service.minutes', { n: value })],
+      [t('act.service.rows.affected'), String(future.length)],
     ]),
-    meta: 'nothing written yet',
+    meta: t('act.nothingWritten'),
     actions: [{
-      label: `Set ${field} to ${field === 'price' ? `${state.settings.currency}${value}` : `${value} min`}`,
-      doingLabel: 'Saving…',
+      label: t('act.service.action', {
+        field: t(`act.service.fieldNames.${field}`),
+        value: field === 'price' ? `${state.settings.currency}${value}` : t('act.service.minutes', { n: value }),
+      }),
+      doingLabel: t('act.service.doing'),
       run: () => runService(ctx, serviceId, field, value, before),
     }],
   };
@@ -706,73 +849,54 @@ function runService(ctx, serviceId, field, value, before) {
             && o.status !== 'cancelled' && o.status !== 'no-show'
             && bs < toMin(o.time) + o.blockMin && bs + block > toMin(o.time));
         })();
-        if (fits) { retimed += 1; logEvent(b, `Block changed to ${block} minutes with the service`); }
+        if (fits) { retimed += 1; logEvent(b, 'blockChanged', { n: block }); }
         else { b.blockMin = old; left += 1; }
       }
     }
   });
   const svc = svcOf(ctx.state, serviceId);
   return {
-    text: `Saved. **${svc.name}** is now ${svc.durationMin} minutes plus ${svc.bufferMin} minutes buffer at ${ctx.state.settings.currency}${svc.priceInr}.`
-      + (field === 'price' ? '' : `\n\n${retimed} future booking${retimed === 1 ? '' : 's'} moved onto the new block${left ? `, ${left} left on the old one because the longer block would have run into the next appointment` : ''}.`),
+    text: t('act.service.done', {
+      service: svcName(svc),
+      duration: svc.durationMin,
+      buffer: svc.bufferMin,
+      price: `${ctx.state.settings.currency}${svc.priceInr}`,
+    })
+      + (field === 'price' ? '' : t('act.service.retimed', { retimed, left })),
     table: {
-      head: ['', 'Before', 'After'],
+      head: t('act.beforeAfter'),
       rows: [
-        ['Duration', `${before.duration} min`, `${svc.durationMin} min`],
-        ['Buffer', `${before.buffer} min`, `${svc.bufferMin} min`],
-        ['Price', `${ctx.state.settings.currency}${before.price}`, `${ctx.state.settings.currency}${svc.priceInr}`],
+        [t('act.service.rowDuration'), t('act.service.minutes', { n: before.duration }), t('act.service.minutes', { n: svc.durationMin })],
+        [t('act.service.rowBuffer'), t('act.service.minutes', { n: before.buffer }), t('act.service.minutes', { n: svc.bufferMin })],
+        [t('act.service.rowPrice'), `${ctx.state.settings.currency}${before.price}`, `${ctx.state.settings.currency}${svc.priceInr}`],
       ],
     },
-    meta: 'Services, the calendar and the booking dialog all read the new figure',
-    suggestions: ['Which service earns most', 'Free slots tomorrow', 'What can you do?'],
+    meta: t('act.service.meta'),
+    suggestions: [t('ans.chips.earnsMost'), t('ans.chips.freeTomorrow'), t('ans.chips.whatCanYouDo')],
   };
 }
 
 /* ============================================================
    what the agent can do — used by the intent and by the About modal
    ============================================================ */
-export const ACTION_EXAMPLES = [
-  {
-    title: 'Book an appointment',
-    input: 'book Anwar for physiotherapy tomorrow at 4',
-    output: 'Names the customer, service, staff member and the exact slot, then books it on confirmation and hands back the token popup. If 4pm is gone it offers the nearest free slot instead.',
-  },
-  {
-    title: 'Reschedule a booking',
-    input: 'move SL-1042 to Thursday at 11',
-    output: 'Finds the record by reference, token or customer name, checks the new slot holds the whole block, and reports the old time against the new one.',
-  },
-  {
-    title: 'Cancel with a reason',
-    input: 'cancel SL-1043 because the customer is unwell',
-    output: 'Puts the reason on the record and in its history, and releases the minutes back onto the grid. With no reason in the sentence it asks for one first.',
-  },
-  {
-    title: 'Run the queue',
-    input: 'call the next token',
-    output: 'Also "mark the current one served" and "A012 did not turn up". Names the token and customer before it changes anything, then shows how many are still waiting.',
-  },
-  {
-    title: 'Hold back staff time',
-    input: "block Nithya's afternoon tomorrow",
-    output: 'Clamps the window to that person\'s shift. If bookings sit inside it, it refuses to write over them and offers to block only the free part.',
-  },
-  {
-    title: 'Change a service',
-    input: 'make the dental cleaning 30 minutes',
-    output: 'Also "set the physiotherapy price to 1200". Retimes the future bookings that still fit the new block and says which were left on the old one.',
-  },
-];
+/* The About modal's worked examples. Read from the dictionary on demand so
+   they are shown in the language the reader chose. */
+export const actionExamples = () => t('act.examples');
+
 
 function helpAnswer(state) {
   return {
-    text: 'Six things I can change for you, on top of answering questions. I always show what I understood first and write nothing until you press the button.',
+    text: t('act.help.text'),
     table: {
-      head: ['Ask me', 'What happens'],
-      rows: ACTION_EXAMPLES.map((e) => [`**${e.title}**\n\`${e.input}\``, e.output]),
+      head: t('act.help.cols'),
+      rows: actionExamples().map((e) => [`**${e.title}**\n\`${e.input}\``, e.output]),
     },
-    meta: `${state.bookings.length} bookings, ${state.services.length} services and ${state.staff.length} staff in reach`,
-    suggestions: ACTION_CHIPS,
+    meta: t('act.help.meta', {
+      bookings: state.bookings.length,
+      services: state.services.length,
+      staff: state.staff.length,
+    }),
+    suggestions: actionChips(),
   };
 }
 
@@ -782,44 +906,44 @@ export function actionIntents(ctx) {
     {
       id: 'act-book',
       match: [/\b(?:book|schedule|register)\b(?!\w)|\bmake an appointment\b|\badd (?:a |an )?(?:booking|appointment)\b|\bput .* (?:in|down) for\b/i, 'book ', 'schedule '],
-      trace: 'read the sentence against the rota and the grid',
+      trace: t('act.trace.book'),
       answer: (q) => proposeBook(ctx, q),
     },
     {
       id: 'act-move',
       match: [/\b(?:reschedule|rebook|move|push|shift|bring forward)\b/i, 'reschedule', 'move '],
-      trace: 'matched the record, then walked the grid for the new slot',
+      trace: t('act.trace.move'),
       answer: (q) => proposeMove(ctx, q),
     },
     {
       id: 'act-cancel',
       match: [/\bcancel\b|\bcall(?:ed)? off\b|\bdrop\b|\bscrap\b/i, 'cancel '],
-      trace: 'matched the record and read the reason out of the sentence',
+      trace: t('act.trace.cancel'),
       answer: (q) => proposeCancel(ctx, q),
     },
     {
       id: 'act-queue',
       match: [/\bcall (?:the )?next\b|\bnext token\b|\bmark\b.*\b(?:served|done|no.?show|serving)\b|\bseat\b|\bfinish(?:ed)?\b.*\b(?:token|current)\b|\b(?:did ?n.?t|did not|never) turn(?:ed)? up\b/i,
         'call next', 'call the next', 'turn up'],
-      trace: 'read the live queue in slot order',
+      trace: t('act.trace.queue'),
       answer: (q) => proposeQueue(ctx, q),
     },
     {
       id: 'act-block',
       match: [/\bblock\b|\bhold back\b|\bkeep .* free\b|\bmark .* (?:unavailable|off)\b|\btake .* off the grid\b/i, 'block '],
-      trace: 'clamped the window to the shift and checked it against the diary',
+      trace: t('act.trace.block'),
       answer: (q) => proposeBlock(ctx, q),
     },
     {
       id: 'act-service',
       match: [/\b(?:change|set|make|update|raise|drop|reduce|increase)\b[^?]*\b(?:price|cost|charge|fee|duration|minutes?|mins?|buffer)\b/i, 'price to', 'minutes'],
-      trace: 'read the service record and every future booking against it',
+      trace: t('act.trace.service'),
       answer: (q) => proposeService(ctx, q),
     },
     {
       id: 'act-help',
       match: [/what can you do|what are you able|help me|\bcommands?\b|what can i ask|things you can do|can you (?:change|do)/i, 'what can you do'],
-      trace: 'listed the action intents in this build',
+      trace: t('act.trace.help'),
       answer: (q, state) => helpAnswer(state),
     },
   ];

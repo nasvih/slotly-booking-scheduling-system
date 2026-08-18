@@ -12,11 +12,12 @@
 
 import { h, icon, money } from '../../lib/ui.js';
 import {
-  todayKey, addDays, dayLabel, relativeDay, hm12, toMin, DOW, DOW_LONG,
+  todayKey, addDays, dayLabel, relativeDay, hm12, toMin, dow, dowLong,
   parseDay, deskNowMin, isOpenDay, staffWorks, freeSlots, freeStaffAt,
-  createBooking, svcOf, staffOf, tokenLabel,
+  createBooking, svcOf, staffOf, tokenLabel, svcName, staffRole, staffRoom, deskName, branchName,
 } from '../data.js';
 import { openToken } from '../token.js';
+import { t } from '../main.js';
 
 const ANY = '__any';
 
@@ -92,10 +93,10 @@ function openSlots(state, date, serviceId, staffId) {
 
 /** The next fourteen days with the number of free slots on each. */
 function dayStrip(state, serviceId) {
-  const t = todayKey();
+  const start = todayKey();
   const out = [];
   for (let i = 0; i < HORIZON; i += 1) {
-    const key = addDays(t, i);
+    const key = addDays(start, i);
     const open = isOpenDay(state, key);
     out.push({ key, open, free: open ? openSlots(state, key, serviceId, ANY).length : 0 });
   }
@@ -126,8 +127,8 @@ export default function render(ctx) {
   if (!active.length) {
     wrap.appendChild(h('div', { class: 'pub__col' },
       h('div', { class: 'empty' },
-        h('h3', {}, 'Online booking is off right now'),
-        h('p', { class: 'small muted' }, 'Nothing can be booked from this page today. Please call the desk instead.'))));
+        h('h3', {}, t('book.offHead')),
+        h('p', { class: 'small muted' }, t('book.offBody')))));
     return wrap;
   }
   if (!active.some((s) => s.id === draft.serviceId)) draft.serviceId = active[0].id;
@@ -136,9 +137,8 @@ export default function render(ctx) {
   wrap.appendChild(col);
 
   col.appendChild(h('div', { class: 'pub__intro' },
-    h('h1', {}, 'Book an appointment'),
-    h('p', { class: 'pub__lede' },
-      `Choose what you need and a time that suits you. ${state.settings.deskName} holds the slot straight away and gives you a token to show at the desk.`)));
+    h('h1', {}, t('book.h1')),
+    h('p', { class: 'pub__lede' }, t('book.lede', { desk: deskName(state) }))));
 
   /* What went wrong, in words, right above the button that refused. The same
      sentence also goes to the page's permanent live region — see announce(). */
@@ -156,7 +156,7 @@ export default function render(ctx) {
   const summaryEl = h('p', { class: 'pub__sum' });
 
   /* --- 1. service --- */
-  const svcHost = h('div', { class: 'pub__opts', role: 'radiogroup', 'aria-label': 'Service' });
+  const svcHost = h('div', { class: 'pub__opts', role: 'radiogroup', 'aria-label': t('book.serviceAria') });
   const drawServices = () => {
     svcHost.innerHTML = '';
     active.forEach((s) => {
@@ -166,8 +166,8 @@ export default function render(ctx) {
         class: `pubopt${on ? ' is-on' : ''}`,
       },
       h('span', { class: 'pubopt__main' },
-        h('span', { class: 'pubopt__name' }, s.name),
-        h('span', { class: 'pubopt__meta' }, `${s.durationMin} minutes`)),
+        h('span', { class: 'pubopt__name' }, svcName(s)),
+        h('span', { class: 'pubopt__meta' }, t('book.minutes', { n: s.durationMin }))),
       h('span', { class: 'pubopt__price mono' }, money(s.priceInr, state.settings.currency)));
       b.addEventListener('click', () => {
         if (draft.serviceId === s.id) return;
@@ -191,16 +191,16 @@ export default function render(ctx) {
     if (!today.open) {
       const next = days.find((d) => d.open);
       dayHost.appendChild(h('p', { class: 'pub__notice' },
-        `We are closed today (${DOW_LONG[parseDay(today.key).getDay()]}).`,
-        next ? ` The next day we open is ${dayLabel(next.key)}.` : ''));
+        t('book.closedToday', { day: dowLong(parseDay(today.key).getDay()) }),
+        next ? t('book.nextOpen', { day: dayLabel(next.key) }) : ''));
     } else if (!today.free) {
       const next = days.find((d) => d.free);
       dayHost.appendChild(h('p', { class: 'pub__notice' },
-        'Today is fully booked.',
-        next ? ` The first free time is on ${dayLabel(next.key)}.` : ''));
+        t('book.fullToday'),
+        next ? t('book.firstFree', { day: dayLabel(next.key) }) : ''));
     }
 
-    const grid = h('div', { class: 'pub__days', role: 'radiogroup', 'aria-label': 'Day' });
+    const grid = h('div', { class: 'pub__days', role: 'radiogroup', 'aria-label': t('book.dayAria') });
     days.forEach((d) => {
       const dt = parseDay(d.key);
       const on = d.key === draft.date;
@@ -211,11 +211,14 @@ export default function render(ctx) {
         'aria-checked': String(on),
         class: `pubday${on ? ' is-on' : ''}${usable ? '' : ' is-off'}`,
         disabled: usable ? null : true,
-        'aria-label': `${dayLabel(d.key)}${usable ? `, ${d.free} time${d.free === 1 ? '' : 's'} free` : d.open ? ', fully booked' : ', closed'}`,
+        'aria-label': t('book.dayAriaFull', {
+          day: dayLabel(d.key),
+          state: usable ? t('book.dayFree', { n: d.free }) : d.open ? t('book.dayFull') : t('book.dayClosed'),
+        }),
       },
-      h('span', { class: 'pubday__dow' }, DOW[dt.getDay()]),
+      h('span', { class: 'pubday__dow' }, dow(dt.getDay())),
       h('span', { class: 'pubday__n' }, String(dt.getDate())),
-      h('span', { class: 'pubday__free' }, d.open ? (d.free ? `${d.free} free` : 'Full') : 'Closed'));
+      h('span', { class: 'pubday__free' }, d.open ? (d.free ? t('book.free', { n: d.free }) : t('book.full')) : t('book.closed')));
       b.addEventListener('click', () => {
         draft.date = d.key;
         draft.time = '';
@@ -241,7 +244,7 @@ export default function render(ctx) {
       const lost = draft.time;
       draft.time = '';
       draft.staffId = ANY;
-      say(`${hm12(lost)} was taken while this page was open. These are the times still free.`, true);
+      say(t('book.lostSlot', { time: hm12(lost) }), true);
     }
     if (!slots.length) {
       timeHost.appendChild(emptyDay(state, draft, (key) => {
@@ -255,7 +258,7 @@ export default function render(ctx) {
       updateSummary();
       return;
     }
-    const grid = h('div', { class: 'pub__times', role: 'radiogroup', 'aria-label': 'Time' });
+    const grid = h('div', { class: 'pub__times', role: 'radiogroup', 'aria-label': t('book.timeAria') });
     slots.forEach((s) => {
       const on = s.time === draft.time;
       const b = h('button', {
@@ -285,10 +288,10 @@ export default function render(ctx) {
     if (!draft.time) return;
     const ids = freeStaffAt(state, draft.date, draft.time, draft.serviceId);
     if (ids.length < 2) return;
-    whoHost.appendChild(h('h2', { class: 'pub__q' }, 'Anyone in particular?',
-      h('span', { class: 'pub__opt' }, 'Optional')));
-    const row = h('div', { class: 'pub__who', role: 'radiogroup', 'aria-label': 'Who you see' });
-    [{ id: ANY, name: 'Whoever is free', role: '' },
+    whoHost.appendChild(h('h2', { class: 'pub__q' }, t('book.qWho'),
+      h('span', { class: 'pub__opt' }, t('book.optional'))));
+    const row = h('div', { class: 'pub__who', role: 'radiogroup', 'aria-label': t('book.whoAria') });
+    [{ id: ANY, name: t('book.whoever'), role: '' },
       ...ids.map((id) => staffOf(state, id))].forEach((p) => {
       const on = (p.id || ANY) === draft.staffId;
       const b = h('button', {
@@ -296,7 +299,7 @@ export default function render(ctx) {
         class: `pubwho${on ? ' is-on' : ''}`,
       },
       h('span', { class: 'pubwho__n' }, p.name),
-      p.role ? h('span', { class: 'pubwho__r' }, p.role) : null);
+      p.role ? h('span', { class: 'pubwho__r' }, staffRole(p)) : null);
       b.addEventListener('click', () => {
         draft.staffId = p.id || ANY;
         drawWho();
@@ -309,41 +312,48 @@ export default function render(ctx) {
 
   const updateSummary = () => {
     const svc = svcOf(state, draft.serviceId);
-    if (!draft.time) { summaryEl.textContent = 'Pick a time above to finish.'; return; }
+    if (!draft.time) { summaryEl.textContent = t('book.pickTime'); return; }
     const ids = freeStaffAt(state, draft.date, draft.time, draft.serviceId)
       .filter((id) => draft.staffId === ANY || id === draft.staffId);
-    const who = ids.length ? staffOf(state, ids[0]).name : 'the next person free';
-    summaryEl.textContent = `${svc.name} · ${relativeDay(draft.date)} at ${hm12(draft.time)} · ${svc.durationMin} minutes with ${who} · ${money(svc.priceInr, state.settings.currency)}.`;
+    const who = ids.length ? staffOf(state, ids[0]).name : t('book.nextPersonFree');
+    summaryEl.textContent = t('book.summary', {
+      service: svcName(svc),
+      day: relativeDay(draft.date),
+      time: hm12(draft.time),
+      duration: svc.durationMin,
+      who,
+      price: money(svc.priceInr, state.settings.currency),
+    });
   };
 
   /* --- 5. details --- */
   const nameIn = h('input', {
     class: 'input', type: 'text', id: 'pub-name', name: 'name',
-    autocomplete: 'name', placeholder: 'Your full name', value: draft.name,
+    autocomplete: 'name', placeholder: t('book.namePlaceholder'), value: draft.name,
   });
   const phoneIn = h('input', {
     class: 'input', type: 'tel', id: 'pub-phone', name: 'phone',
-    autocomplete: 'tel', inputmode: 'tel', placeholder: '98765 43210', value: draft.phone,
+    autocomplete: 'tel', inputmode: 'tel', placeholder: t('book.mobilePlaceholder'), value: draft.phone,
   });
   const noteIn = h('input', {
     class: 'input', type: 'text', id: 'pub-note', name: 'note',
-    placeholder: 'Anything the desk should know', value: draft.note,
+    placeholder: t('book.notePlaceholder'), value: draft.note,
   });
   nameIn.addEventListener('input', () => { draft.name = nameIn.value; });
   phoneIn.addEventListener('input', () => { draft.phone = phoneIn.value; });
   noteIn.addEventListener('input', () => { draft.note = noteIn.value; });
 
-  const confirmBtn = h('button', { class: 'btn btn--primary pub__go', type: 'submit' }, 'Confirm booking');
+  const confirmBtn = h('button', { class: 'btn btn--primary pub__go', type: 'submit' }, t('book.confirm'));
 
   const form = h('form', { class: 'pub__form', novalidate: true },
     h('div', { class: 'pub__fields' },
       h('div', { class: 'field' },
-        h('label', { class: 'field__label', for: 'pub-name' }, 'Your name'), nameIn),
+        h('label', { class: 'field__label', for: 'pub-name' }, t('book.yourName')), nameIn),
       h('div', { class: 'field' },
-        h('label', { class: 'field__label', for: 'pub-phone' }, 'Mobile number'), phoneIn,
-        h('p', { class: 'hint' }, 'So the desk can reach you if anything changes.')),
+        h('label', { class: 'field__label', for: 'pub-phone' }, t('book.mobile')), phoneIn,
+        h('p', { class: 'hint' }, t('book.mobileHint'))),
       h('div', { class: 'field' },
-        h('label', { class: 'field__label', for: 'pub-note' }, 'Note (optional)'), noteIn)),
+        h('label', { class: 'field__label', for: 'pub-note' }, t('book.noteLabel')), noteIn)),
     summaryEl,
     live,
     confirmBtn);
@@ -351,16 +361,16 @@ export default function render(ctx) {
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!draft.time) {
-      say('Pick a time before confirming.', true);
+      say(t('book.errTime'), true);
       return;
     }
     if (draft.name.trim().length < 2) {
-      say('Please tell us your name.', true);
+      say(t('book.errName'), true);
       nameIn.focus();
       return;
     }
     if (!phoneOk(draft.phone)) {
-      say('That mobile number does not look right. Enter the ten digits, for example 98765 43210.', true);
+      say(t('book.errPhone'), true);
       phoneIn.focus();
       return;
     }
@@ -374,7 +384,7 @@ export default function render(ctx) {
       draft.staffId = ANY;
       drawDays();
       drawTimes();
-      say(`Sorry — ${hm12(taken)} was taken a moment ago. The times below are the ones still open.`, true);
+      say(t('book.errTaken', { time: hm12(taken) }), true);
       return;
     }
 
@@ -403,24 +413,24 @@ export default function render(ctx) {
         channel: 'Website',
         note: draft.note.trim(),
       });
-      made.history = [{ at: Date.now(), text: 'Booked by the customer online' }];
+      made.history = [{ at: Date.now(), key: 'bookedOnline' }];
       /* Set before the store notifies its subscribers, so the redraw that
          write causes paints the confirmation rather than the empty form. */
       confirmedId = made.id;
     });
     const fresh = ctx.state.bookings.find((b) => b.id === confirmedId);
-    if (fresh) openToken(ctx, fresh, { title: 'Booked' });
+    if (fresh) openToken(ctx, fresh, { title: t('dialog.bookedTitle') });
   });
 
   /* --- assemble --- */
-  col.appendChild(h('h2', { class: 'pub__q' }, 'What do you need?'));
+  col.appendChild(h('h2', { class: 'pub__q' }, t('book.qService')));
   col.appendChild(svcHost);
-  col.appendChild(h('h2', { class: 'pub__q' }, 'Which day?'));
+  col.appendChild(h('h2', { class: 'pub__q' }, t('book.qDay')));
   col.appendChild(dayHost);
-  col.appendChild(h('h2', { class: 'pub__q' }, 'What time?'));
+  col.appendChild(h('h2', { class: 'pub__q' }, t('book.qTime')));
   col.appendChild(timeHost);
   col.appendChild(whoHost);
-  col.appendChild(h('h2', { class: 'pub__q' }, 'Who are we booking for?'));
+  col.appendChild(h('h2', { class: 'pub__q' }, t('book.qDetails')));
   col.appendChild(form);
 
   drawServices();
@@ -444,16 +454,16 @@ export default function render(ctx) {
 /** Why a chosen day has nothing on it, said in the words that are true. */
 function emptyDay(state, d, onJump) {
   const svc = svcOf(state, d.serviceId);
-  let head = 'Nothing free that day';
-  let body = `Every ${svc.name.toLowerCase()} time on ${dayLabel(d.date)} has been taken. Try another day below.`;
+  let head = t('book.emptyNothing');
+  let body = t('book.emptyNothingBody', { service: svcName(svc), day: dayLabel(d.date) });
   if (!isOpenDay(state, d.date)) {
-    head = 'We are closed that day';
-    body = `${state.settings.deskName} does not open on ${DOW_LONG[parseDay(d.date).getDay()]}. Please pick another day.`;
+    head = t('book.emptyClosed');
+    body = t('book.emptyClosedBody', { desk: deskName(state), day: dowLong(parseDay(d.date).getDay()) });
   } else if (!anyoneOnDuty(state, d.date, d.serviceId)) {
-    head = 'Nobody is in that day';
-    body = `Nobody who does ${svc.name.toLowerCase()} is working on ${dayLabel(d.date)}. Another day will work.`;
+    head = t('book.emptyNobody');
+    body = t('book.emptyNobodyBody', { service: svcName(svc), day: dayLabel(d.date) });
   } else if (d.date === todayKey()) {
-    body = `There is no ${svc.name.toLowerCase()} time left today. Try another day below.`;
+    body = t('book.emptyTodayBody', { service: svcName(svc) });
   }
 
   const box = h('div', { class: 'empty pub__empty' },
@@ -466,7 +476,7 @@ function emptyDay(state, d, onJump) {
   if (next) {
     const first = openSlots(state, next.key, d.serviceId, ANY)[0];
     const b = h('button', { class: 'btn', type: 'button' },
-      `Go to ${relativeDay(next.key)}${first ? `, from ${hm12(first.time)}` : ''}`);
+      t('book.goTo', { day: relativeDay(next.key), from: first ? hm12(first.time) : '' }));
     b.addEventListener('click', () => onJump(next.key));
     box.appendChild(h('div', { class: 'pub__emptyact' }, b));
   }
@@ -481,28 +491,31 @@ function confirmation(ctx, b) {
   const col = h('div', { class: 'pub__col' });
 
   const rows = [
-    ['What', svc.name],
-    ['When', `${relativeDay(b.date)}, ${dayLabel(b.date)} at ${hm12(b.time)}`],
-    ['With', `${st.name}${st.room ? ` · ${st.room}` : ''}`],
-    ['Where', `${state.settings.deskName} · ${state.settings.branch}`],
-    ['To pay at the desk', money(svc.priceInr, state.settings.currency)],
+    [t('book.rows.what'), svcName(svc)],
+    [t('book.rows.when'), t('book.whenLine', { rel: relativeDay(b.date), day: dayLabel(b.date), time: hm12(b.time) })],
+    [t('book.rows.with'), `${st.name}${staffRoom(st) ? ` · ${staffRoom(st)}` : ''}`],
+    [t('book.rows.where'), t('book.whereLine', { desk: deskName(state), branch: branchName(state) })],
+    [t('book.rows.pay'), money(svc.priceInr, state.settings.currency)],
   ];
 
-  announce(`Booked. Token ${tokenLabel(state, b)}, reference ${b.ref}. ${svc.name} on ${dayLabel(b.date)} at ${hm12(b.time)} with ${st.name}.`);
+  announce(t('book.announce', {
+    token: tokenLabel(state, b), ref: b.ref, service: svcName(svc),
+    day: dayLabel(b.date), time: hm12(b.time), staff: st.name,
+  }));
 
   const card = h('div', { class: 'pubdone' },
     h('div', { class: 'pubdone__tick', 'aria-hidden': 'true', html: icon('check') }),
-    h('h1', { class: 'pubdone__h' }, 'You are booked'),
-    h('p', { class: 'pubdone__sub' }, `Show token ${tokenLabel(state, b)} at the desk. Please arrive about ten minutes early.`),
+    h('h1', { class: 'pubdone__h' }, t('book.doneH')),
+    h('p', { class: 'pubdone__sub' }, t('book.doneSub', { token: tokenLabel(state, b) })),
     h('div', { class: 'pubdone__tok' },
-      h('div', { class: 'pubdone__toklabel' }, 'Your token'),
+      h('div', { class: 'pubdone__toklabel' }, t('book.yourToken')),
       h('div', { class: 'pubdone__tokn mono' }, tokenLabel(state, b)),
       h('div', { class: 'pubdone__ref mono' }, b.ref)),
     h('dl', { class: 'pubdone__kv' }, rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, v)])));
 
-  const slipBtn = h('button', { class: 'btn btn--primary', type: 'button' }, 'Show my token');
-  slipBtn.addEventListener('click', () => openToken(ctx, b, { title: 'Booked' }));
-  const againBtn = h('button', { class: 'btn', type: 'button' }, 'Book another');
+  const slipBtn = h('button', { class: 'btn btn--primary', type: 'button' }, t('book.showToken'));
+  slipBtn.addEventListener('click', () => openToken(ctx, b, { title: t('dialog.bookedTitle') }));
+  const againBtn = h('button', { class: 'btn', type: 'button' }, t('book.bookAnother'));
   againBtn.addEventListener('click', () => {
     confirmedId = null;
     draft = blankDraft(ctx.state);

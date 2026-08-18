@@ -8,8 +8,10 @@
    ============================================================ */
 
 import { h, toast } from '../lib/ui.js';
+import { t } from './main.js';
 import {
   dayLabel, hm12, relativeDay, svcOf, staffOf, custOf, tokenLabel, toMin, toHM,
+  deskName, branchName, svcName,
 } from './data.js';
 
 const CLOSE_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>';
@@ -26,14 +28,14 @@ function slipData(state, b) {
   return {
     token: tokenLabel(state, b),
     ref: b.ref,
-    desk: state.settings.deskName,
-    branch: state.settings.branch,
+    desk: deskName(state),
+    branch: branchName(state),
     rows: [
-      ['Customer', custOf(state, b.customerId).name],
-      ['Service', svc.name],
-      ['With', staffOf(state, b.staffId).name],
-      ['Date', dayLabel(b.date)],
-      ['Time', `${hm12(b.time)} — ${hm12(toHM(toMin(b.time) + b.blockMin))}`],
+      [t('token.rows.customer'), custOf(state, b.customerId).name],
+      [t('token.rows.service'), svcName(svc)],
+      [t('token.rows.with'), staffOf(state, b.staffId).name],
+      [t('token.rows.date'), dayLabel(b.date)],
+      [t('token.rows.time'), `${hm12(b.time)} — ${hm12(toHM(toMin(b.time) + b.blockMin))}`],
     ],
   };
 }
@@ -63,20 +65,25 @@ function drawSlip(data) {
   c.textBaseline = 'alphabetic';
 
   const mono = (size, weight = 500) => `${weight} ${size}px "JetBrains Mono", ui-monospace, monospace`;
-  const sans = (size, weight = 600) => `${weight} ${size}px "Inter", system-ui, sans-serif`;
+  const sans = (size, weight = 600) => `${weight} ${size}px "IBM Plex Sans Arabic", "Inter", system-ui, sans-serif`;
+  /* The slip is a printed object, so the label column has to sit on whichever
+     edge the reader's script starts from — otherwise every row hangs off the
+     wrong side of the rule. */
+  const rtl = document.documentElement.dir === 'rtl';
+  if (rtl) c.direction = 'rtl';
 
   /* header */
   c.textAlign = 'center';
   c.font = mono(26, 600);
-  c.fillText('SLOTLY · APPOINTMENT TOKEN', W / 2, 132);
+  c.fillText(t('token.slipTitle'), W / 2, 132);
   c.font = sans(34, 700);
   c.fillText(data.desk, W / 2, 190);
   c.font = sans(24, 500);
   c.fillText(data.branch, W / 2, 232);
 
   /* the number */
-  c.font = mono(28, 600);
-  c.fillText('YOUR TOKEN', W / 2, 330);
+  c.font = rtl ? sans(30, 600) : mono(28, 600);
+  c.fillText(t('token.slipToken'), W / 2, 330);
   c.font = mono(232, 700);
   c.fillText(data.token, W / 2, 520);
   c.font = mono(40, 500);
@@ -89,23 +96,24 @@ function drawSlip(data) {
   c.stroke();
 
   /* the detail rows */
-  c.textAlign = 'left';
+  c.textAlign = rtl ? 'right' : 'left';
+  const edge = rtl ? W - 120 : 120;
   let y = 728;
   for (const [label, value] of data.rows) {
-    c.font = mono(24, 600);
-    c.fillText(label.toUpperCase(), 120, y);
+    c.font = rtl ? sans(26, 600) : mono(24, 600);
+    c.fillText(rtl ? label : label.toUpperCase(), edge, y);
     c.font = sans(40, 600);
     const text = fit(c, String(value), W - 240);
-    c.fillText(text, 120, y + 52);
+    c.fillText(text, edge, y + 52);
     y += 116;
   }
 
   /* footer */
   c.textAlign = 'center';
-  c.font = mono(24, 500);
-  c.fillText('Show this at the front desk', W / 2, H - 122);
+  c.font = rtl ? sans(26, 500) : mono(24, 500);
+  c.fillText(t('token.slipFoot'), W / 2, H - 122);
   c.font = mono(22, 500);
-  c.fillText('Demo build · nasvih.in', W / 2, H - 80);
+  c.fillText(t('token.slipBuild'), W / 2, H - 80);
 
   return cv;
 }
@@ -123,14 +131,14 @@ async function downloadSlip(data) {
   const cv = drawSlip(data);
   await new Promise((resolve) => {
     cv.toBlob((blob) => {
-      if (!blob) { toast('The image could not be drawn in this browser', 'bad'); resolve(); return; }
+      if (!blob) { toast(t('token.drawFailed'), 'bad'); resolve(); return; }
       const url = URL.createObjectURL(blob);
       const a = h('a', { href: url, download: `slotly-token-${data.token}-${data.ref}.png` });
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
-      toast(`Saved slotly-token-${data.token}.png`, 'ok');
+      toast(t('token.saved', { file: `slotly-token-${data.token}.png` }), 'ok');
       resolve();
     }, 'image/png');
   });
@@ -152,31 +160,30 @@ export function openToken(ctx, b, opts = {}) {
 
   const closeBtn = h('button', {
     class: 'tokenpop__x', type: 'button',
-    'aria-label': 'Close the token slip', title: 'Close',
+    'aria-label': t('token.close'), title: t('token.closeShort'),
     html: CLOSE_SVG,
   });
   const dlBtn = h('button', {
     class: 'btn tokenpop__dl', type: 'button',
-    title: 'Save the token as a PNG image',
-    html: `${DOWN_SVG}<span>Download</span>`,
+    title: t('token.downloadTitle'),
+    html: `${DOWN_SVG}<span>${t('token.download')}</span>`,
   });
-  const doneBtn = h('button', { class: 'btn tokenpop__done', type: 'button' }, 'Done');
+  const doneBtn = h('button', { class: 'btn tokenpop__done', type: 'button' }, t('token.done'));
 
   const box = h('div', {
     class: 'tokenpop', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId,
   },
   h('div', { class: 'tokenpop__head' },
-    h('span', { class: 'tokenpop__eyebrow' }, opts.title || 'Booking token'),
+    h('span', { class: 'tokenpop__eyebrow' }, opts.title || t('token.eyebrow')),
     closeBtn),
-  h('div', { class: 'tokenpop__label' }, 'Your token'),
-  h('div', { class: 'tokenpop__num', id: titleId }, data.token),
-  h('div', { class: 'tokenpop__ref' }, data.ref),
+  h('div', { class: 'tokenpop__label' }, t('token.yourToken')),
+  h('div', { class: 'tokenpop__num', id: titleId, dir: 'ltr' }, data.token),
+  h('div', { class: 'tokenpop__ref', dir: 'ltr' }, data.ref),
   h('dl', { class: 'tokenpop__kv' }, data.rows.flatMap(([k, v]) => [
     h('dt', {}, k),
     h('dd', {}, v),
   ])),
-  h('p', { class: 'tokenpop__note' },
-    `Show this at ${data.desk}. Download it below, or just take a screenshot — either one gets you through the door.`),
+  h('p', { class: 'tokenpop__note' }, t('token.note', { desk: data.desk })),
   h('div', { class: 'tokenpop__foot' }, dlBtn, doneBtn));
 
   const scrim = h('div', { class: 'tokscrim' }, box);
@@ -207,7 +214,7 @@ export function openToken(ctx, b, opts = {}) {
     dlBtn.disabled = true;
     const span = dlBtn.querySelector('span');
     const was = span.textContent;
-    span.textContent = 'Saving…';
+    span.textContent = t('token.saving');
     await downloadSlip(data);
     span.textContent = was;
     dlBtn.disabled = false;
@@ -222,13 +229,13 @@ export function openToken(ctx, b, opts = {}) {
 }
 
 /** A small "Token" control for a booking row — the popup is never one-time. */
-export function tokenButton(ctx, b, { small = true, label = 'Token' } = {}) {
+export function tokenButton(ctx, b, { small = true, label = null } = {}) {
   const btn = h('button', {
     class: `btn${small ? ' btn--sm' : ''}`,
     type: 'button',
-    'aria-label': `Show the token slip for ${b.ref}`,
-    title: `Show token ${tokenLabel(ctx.state, b)} again`,
-  }, label);
-  btn.addEventListener('click', () => openToken(ctx, b, { title: `${relativeDay(b.date)} booking` }));
+    'aria-label': t('token.buttonAria', { ref: b.ref }),
+    title: t('token.buttonTitle', { token: tokenLabel(ctx.state, b) }),
+  }, label || t('token.button'));
+  btn.addEventListener('click', () => openToken(ctx, b, { title: t('bookings.tokenTitle', { day: relativeDay(b.date) }) }));
   return btn;
 }

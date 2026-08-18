@@ -1,5 +1,8 @@
 /* ============================================================
    slotly — plain-language parsing for the desk agent.
+   The sentences it reads are English: this is a matcher over English verbs,
+   English weekday names and the canonical English service names the seed
+   writes into the store, so it deliberately never looks at the dictionary.
    Turns a typed sentence into the records it names: a day, a time,
    a service, a staff member, a customer, a booking, a window of the
    day. Nothing here mutates; it only reads the live state so the
@@ -8,24 +11,25 @@
 
 import {
   todayKey, addDays, parseDay, toMin, toHM, gridSlots, staffOf,
-  OPEN_STATUSES, DOW_LONG,
+  OPEN_STATUSES, DOW_LONG_EN,
 } from './data.js';
+import { t } from './main.js';
 
 /* ---------- day ---------- */
 export function matchDay(q) {
   const text = String(q).toLowerCase();
-  const t = todayKey();
-  if (/\btoday\b|\btonight\b/.test(text)) return t;
-  if (/day after tomorrow/.test(text)) return addDays(t, 2);
-  if (/\btomorrow\b|\btmrw\b/.test(text)) return addDays(t, 1);
-  if (/\byesterday\b/.test(text)) return addDays(t, -1);
+  const tk = todayKey();
+  if (/\btoday\b|\btonight\b/.test(text)) return tk;
+  if (/day after tomorrow/.test(text)) return addDays(tk, 2);
+  if (/\btomorrow\b|\btmrw\b/.test(text)) return addDays(tk, 1);
+  if (/\byesterday\b/.test(text)) return addDays(tk, -1);
   const iso = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
   if (iso) return iso[1];
   for (let i = 0; i < 7; i += 1) {
-    if (new RegExp(`\\b${DOW_LONG[i].toLowerCase()}\\b`).test(text)) {
+    if (new RegExp(`\\b${DOW_LONG_EN[i].toLowerCase()}\\b`).test(text)) {
       const ahead = /\bnext\b/.test(text) ? 7 : 0;
       for (let d = 0; d < 8; d += 1) {
-        const key = addDays(t, d + ahead);
+        const key = addDays(tk, d + ahead);
         if (parseDay(key).getDay() === i) return key;
       }
     }
@@ -112,11 +116,11 @@ export function bookingCustomer(state, q) {
     if (c) return { customer: c, phrase: p.trim(), isNew: false };
   }
   for (const p of phrases) {
-    const t = p.trim().replace(/\s+/g, ' ');
-    if (!t || t.length < 2 || NON_NAME.test(t)) continue;
-    if (matchService(state, t) || matchStaff(state, t)) continue;
-    if (!/^[A-Za-z][A-Za-z .'-]{1,40}$/.test(t)) continue;
-    return { customer: null, phrase: t.replace(/\b[a-z]/g, (ch) => ch.toUpperCase()), isNew: true };
+    const cand = p.trim().replace(/\s+/g, ' ');
+    if (!cand || cand.length < 2 || NON_NAME.test(cand)) continue;
+    if (matchService(state, cand) || matchStaff(state, cand)) continue;
+    if (!/^[A-Za-z][A-Za-z .'-]{1,40}$/.test(cand)) continue;
+    return { customer: null, phrase: cand.replace(/\b[a-z]/g, (ch) => ch.toUpperCase()), isNew: true };
   }
   return { customer: null, phrase: '', isNew: false };
 }
@@ -171,8 +175,8 @@ export function matchBooking(state, q) {
   const tok = text.match(new RegExp(`\\b${prefix}\\s?(\\d{1,3})\\b`, 'i'));
   if (tok) {
     const n = Number(tok[1]);
-    const t = todayKey();
-    const hits = state.bookings.filter((b) => b.date === t && b.token === n && b.status !== 'cancelled');
+    const tk = todayKey();
+    const hits = state.bookings.filter((b) => b.date === tk && b.token === n && b.status !== 'cancelled');
     return { booking: hits[0] || null, list: hits, how: 'token', label: `${prefix}${String(n).padStart(3, '0')}` };
   }
   const c = matchCustomer(state, text);
@@ -205,14 +209,14 @@ export function matchWindow(state, q, staffId, key, nowMin) {
   if (range) {
     const a = matchTime(state, `at ${range[1]}`);
     const b = matchTime(state, `at ${range[2]}`);
-    if (a && b) return out(clamp(toMin(a)), clamp(toMin(b)), `${a} to ${b}`);
+    if (a && b) return out(clamp(toMin(a)), clamp(toMin(b)), t('act.block.windows.range', { from: a, to: b }));
   }
-  if (/\bafternoon\b/.test(text)) return out(clamp(Math.max(shiftS, 13 * 60)), shiftE, 'the afternoon');
-  if (/\bmorning\b/.test(text)) return out(shiftS, clamp(Math.min(shiftE, 13 * 60)), 'the morning');
+  if (/\bafternoon\b/.test(text)) return out(clamp(Math.max(shiftS, 13 * 60)), shiftE, t('act.block.windows.afternoon'));
+  if (/\bmorning\b/.test(text)) return out(shiftS, clamp(Math.min(shiftE, 13 * 60)), t('act.block.windows.morning'));
   if (/\brest of (?:the )?day\b|\bremainder of (?:the )?day\b/.test(text)) {
-    return out(clamp(Math.max(shiftS, nowMin || shiftS)), shiftE, 'the rest of the day');
+    return out(clamp(Math.max(shiftS, nowMin || shiftS)), shiftE, t('act.block.windows.rest'));
   }
-  if (/\ball day\b|\bwhole day\b|\bentire day\b|\bfull day\b|\bday off\b/.test(text)) return out(shiftS, shiftE, 'the whole day');
+  if (/\ball day\b|\bwhole day\b|\bentire day\b|\bfull day\b|\bday off\b/.test(text)) return out(shiftS, shiftE, t('act.block.windows.whole'));
   return null;
 }
 

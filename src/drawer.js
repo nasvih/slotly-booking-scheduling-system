@@ -1,6 +1,7 @@
 /* Right-hand detail drawer. Same visual language as the modal in lib/ui.js. */
 
 import { h, icon } from '../lib/ui.js';
+import { t } from './main.js';
 
 export function drawer({ title, subtitle, body, actions = [] }) {
   const scrim = h('div', { class: 'scrim', style: 'place-items:stretch;padding:0' });
@@ -10,10 +11,10 @@ export function drawer({ title, subtitle, body, actions = [] }) {
   };
   function onKey(e) { if (e.key === 'Escape') close(); }
 
-  const closeBtn = h('button', { class: 'btn btn--ghost btn--icon', 'aria-label': 'Close panel', html: icon('x') });
+  const closeBtn = h('button', { class: 'btn btn--ghost btn--icon', 'aria-label': t('common.closePanel'), html: icon('x') });
   closeBtn.addEventListener('click', close);
 
-  const panel = h('aside', { class: 'drawer', role: 'dialog', 'aria-label': title || 'Details' },
+  const panel = h('aside', { class: 'drawer', role: 'dialog', 'aria-label': title || t('common.details') },
     h('div', { class: 'drawer__head' },
       h('div', { style: 'flex:1;min-width:0' },
         h('div', { class: 'topbar__title truncate' }, title || ''),

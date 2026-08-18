@@ -2,12 +2,14 @@
    slotly — boot: store, shell, nav, hash router, assistant.
    ============================================================ */
 
-import { h, qs, icon, createStore, router, toast, modal, confirmDialog } from '../lib/ui.js';
+import { h, qs, icon, createStore, router, toast, modal, confirmDialog, setRelativeLabels } from '../lib/ui.js';
+import { createI18n } from '../lib/i18n.js';
+import { STRINGS } from './strings.js';
 import { initPWA } from '../lib/pwa.js';
-import { STORE_KEY, seedState, ensureShape, todayKey, liveOn, OPEN_STATUSES } from './data.js';
+import { STORE_KEY, seedState, ensureShape, todayKey, liveOn, OPEN_STATUSES, deskName, branchName } from './data.js';
 import { buildAgent } from './agent.js';
 import { openBooking } from './booking.js';
-import { ACTION_EXAMPLES } from './actions.js';
+import { actionExamples } from './actions.js';
 import { mountBell } from './notify.js';
 import { themeToggle, deviceControls, applyTheme, readTheme, IS_FRAMED } from './chrome.js';
 
@@ -19,6 +21,20 @@ import renderServices from './views/services.js';
 import renderStaff from './views/staff.js';
 import renderCustomers from './views/customers.js';
 import renderSettings from './views/settings.js';
+
+/* Language first: every string below this line is read through it, and
+   lib/i18n.js paints `lang`/`dir` onto <html> the moment it is created.
+   index.html has already done the same inline, so nothing repaints. */
+const i18n = createI18n({ key: 'slotly', dict: STRINGS });
+export const t = i18n.t;
+/* lib/ui.js formats "3h ago" and the calendar's dates; it is shared by every
+   demo app and holds no dictionary of its own, so it is handed one. */
+setRelativeLabels({
+  justNow: () => t('rel.justNow'),
+  minutes: (n) => t('rel.minutes', { n }),
+  hours: (n) => t('rel.hours', { n }),
+  days: (n) => t('rel.days', { n }),
+});
 
 /* The theme is read before anything is drawn — index.html sets it inline so
    there is no white flash, and this keeps the two in step. */
@@ -36,26 +52,30 @@ store.subscribe((s) => ensureShape(s));
 const PUBLIC = 'book';
 
 const VIEWS = [
-  { id: 'today', label: 'Today', icon: 'clock', group: 'Desk', title: 'Today', sub: 'Live queue', render: renderToday },
-  { id: 'calendar', label: 'Calendar', icon: 'calendar', group: 'Desk', title: 'Calendar', sub: 'Week grid', render: renderCalendar },
-  { id: 'bookings', label: 'Bookings', icon: 'table', group: 'Desk', title: 'Bookings', sub: 'All records', render: renderBookings },
-  { id: 'services', label: 'Services', icon: 'tag', group: 'Setup', title: 'Services', sub: 'Duration and price', render: renderServices },
-  { id: 'staff', label: 'Staff', icon: 'users', group: 'Setup', title: 'Staff', sub: 'Working hours', render: renderStaff },
-  { id: 'customers', label: 'Customers', icon: 'user', group: 'Setup', title: 'Customers', sub: 'History and no-shows', render: renderCustomers },
-  { id: 'settings', label: 'Settings', icon: 'cog', group: 'Setup', title: 'Settings', sub: 'Desk configuration', render: renderSettings },
-];
+  { id: 'today', icon: 'clock', group: 'Desk', render: renderToday },
+  { id: 'calendar', icon: 'calendar', group: 'Desk', render: renderCalendar },
+  { id: 'bookings', icon: 'table', group: 'Desk', render: renderBookings },
+  { id: 'services', icon: 'tag', group: 'Setup', render: renderServices },
+  { id: 'staff', icon: 'users', group: 'Setup', render: renderStaff },
+  { id: 'customers', icon: 'user', group: 'Setup', render: renderCustomers },
+  { id: 'settings', icon: 'cog', group: 'Setup', render: renderSettings },
+].map((v) => Object.assign(v, {
+  label: t(`views.${v.id}.label`),
+  title: t(`views.${v.id}.title`),
+  sub: t(`views.${v.id}.sub`),
+}));
 
 /* ---------- shell ---------- */
 const app = qs('#app');
 
 const sideEl = h('aside', { class: 'side', id: 'side' });
-const navEl = h('nav', { class: 'side__nav', 'aria-label': 'Sections' });
-const titleEl = h('div', { class: 'topbar__title' }, 'Today');
-const subEl = h('div', { class: 'topbar__sub' }, 'Live queue');
+const navEl = h('nav', { class: 'side__nav', 'aria-label': t('nav.sections') });
+const titleEl = h('div', { class: 'topbar__title' }, VIEWS[0].title);
+const subEl = h('div', { class: 'topbar__sub' }, VIEWS[0].sub);
 const viewHost = h('main', { class: 'view view--pad', id: 'viewhost' });
 
 const menuBtn = h('button', {
-  class: 'btn btn--ghost btn--icon sidebtn', 'aria-label': 'Open navigation', 'aria-expanded': 'false',
+  class: 'btn btn--ghost btn--icon sidebtn', 'aria-label': t('nav.open'), 'aria-expanded': 'false',
   html: icon('menu'),
 });
 const setDrawer = (open) => {
@@ -78,9 +98,9 @@ document.addEventListener('keydown', (e) => {
    button itself rather than by the span the stylesheet takes away. */
 const newBtn = h('button', {
   class: 'btn btn--primary',
-  'aria-label': 'New booking',
-  title: 'New booking',
-  html: `${icon('plus')}<span>New booking</span>`,
+  'aria-label': t('common.newBooking'),
+  title: t('common.newBooking'),
+  html: `${icon('plus')}<span>${t('common.newBooking')}</span>`,
 });
 newBtn.addEventListener('click', () => openBooking(ctx, {}));
 
@@ -90,52 +110,28 @@ const REPO_URL = 'https://github.com/nasvih/slotly-booking-scheduling-system';
    real deployment would change, the demo disclaimer, and where to read the
    source. Each block is a paragraph, a short list or a link, so it stays
    scannable inside the modal at 390px. */
-const ABOUT = [
-  {
-    title: 'What this is',
-    text: 'Slotly runs a front desk. Booked appointments and walk-in tokens sit in the same queue on the same day, a week calendar shows every staff member side by side, and each service carries its own duration and buffer so the diary reflects how long the work actually takes. Every booking has a confirmation message written from a template.',
-  },
-  {
-    title: 'Where it helps a business',
-    list: [
-      'The diary stops being a paper book that only one person can read.',
-      'Double-booking becomes impossible — the slot is held the moment it is taken.',
-      'Walk-ins get a token instead of a crowd at the counter.',
-      'No-show patterns become visible per customer instead of being felt.',
-      'Staff hours, breaks and days off are part of the booking rules, not something the receptionist has to remember.',
-    ],
-  },
-  {
-    title: 'How it would work for real',
-    text: 'The same interface, with browser storage swapped for a real database, staff accounts behind a login, and confirmations actually sent by message or email. What you are looking at is the interface and the workflow, not the production system behind them.',
-  },
-  {
-    title: 'What the assistant can change',
-    text: 'Slotly Desk answers questions, and it also does the work. Type the request in plain words: it shows you exactly which record it read, and writes nothing until you press the button on its reply.',
-    examples: ACTION_EXAMPLES,
-  },
-  {
-    title: 'How this demo works',
-    list: [
-      ['You can actually use it.', 'Every screen is live. Book a slot, move it, cancel it, call a token, edit a rota, change a service or rewrite a message template — nothing here is read-only and nothing is a mock-up.'],
-      ['Your data stays on your machine.', 'Everything you enter is saved in this browser\'s local storage. There is no account, no server and no backend behind this build. Clear your browser data or use "Reset demo data" and it is all gone.'],
-      ['The assistant is simulated.', 'Slotly Desk answers by matching your question against this app\'s own demo data. It is a demonstration of the interaction, not a connected model, and no request leaves your browser.'],
-    ],
-  },
-  {
-    title: 'Source',
-    link: { href: REPO_URL, label: 'github.com/nasvih/slotly-booking-scheduling-system' },
-    /* Must not read as more permissive than LICENSE: source-available, not
-       open source, and anything past reading and running needs permission. */
-    text: 'The source is published so it can be read, run and evaluated. It is not open source — copying, modifying, redistributing or using it in your own work needs the author\'s written permission.',
-  },
-];
+function aboutBlocks() {
+  return [
+    { title: t('about.what.title'), text: t('about.what.text') },
+    { title: t('about.helps.title'), list: t('about.helps.list') },
+    { title: t('about.real.title'), text: t('about.real.text') },
+    { title: t('about.agent.title'), text: t('about.agent.text'), examples: actionExamples() },
+    { title: t('about.demo.title'), list: t('about.demo.list') },
+    {
+      title: t('about.source.title'),
+      link: { href: REPO_URL, label: 'github.com/nasvih/slotly-booking-scheduling-system' },
+      /* Must not read as more permissive than LICENSE: source-available, not
+         open source, and anything past reading and running needs permission. */
+      text: t('about.source.text'),
+    },
+  ];
+}
 
 function aboutModal() {
   modal({
-    title: 'About this demo',
+    title: t('about.title'),
     width: '520px',
-    body: h('div', { class: 'stack' }, ABOUT.map((block) => h('div', {},
+    body: h('div', { class: 'stack' }, aboutBlocks().map((block) => h('div', {},
       h('h4', { style: 'margin-bottom:4px' }, block.title),
       block.link ? h('p', { class: 'small', style: 'margin-bottom:4px' },
         h('a', {
@@ -143,7 +139,7 @@ function aboutModal() {
           href: block.link.href,
           target: '_blank',
           rel: 'noopener noreferrer',
-          'aria-label': `${block.link.label} — opens in a new tab`,
+          'aria-label': t('nav.newTab', { label: block.link.label }),
         }, block.link.label)) : null,
       block.text ? h('p', { class: 'small muted' }, block.text) : null,
       block.list ? h('ul', { class: 'aboutlist' }, block.list.map((line) => (
@@ -157,7 +153,7 @@ function aboutModal() {
         h('div', { class: 'exrow__t' }, e.title),
         h('code', { class: 'exrow__in' }, e.input),
         h('p', { class: 'exrow__out small muted' }, e.output)))) : null))),
-    actions: [{ label: 'Got it', class: 'btn--primary' }],
+    actions: [{ label: t('common.gotIt'), class: 'btn--primary' }],
   });
 }
 
@@ -166,31 +162,30 @@ function aboutModal() {
 const demoPill = h('button', {
   class: 'pill pill--amber aboutpill',
   type: 'button',
-  'aria-label': 'About this demo',
-  title: 'Everything here is sample data held in this browser. Nothing is sent anywhere.',
-}, 'About this demo');
+  'aria-label': t('common.aboutDemo'),
+  title: t('common.aboutPill'),
+}, t('common.aboutDemo'));
 demoPill.addEventListener('click', aboutModal);
 
 const brandEl = h('div', { class: 'side__brand' },
-  h('span', { class: 'mark' }, 'SL'),
+  h('span', { class: 'mark' }, t('app.mark')),
   h('div', { style: 'min-width:0' },
-    h('div', { class: 'side__name' }, 'slotly'),
-    h('div', { class: 'side__tag' }, 'Booking desk')));
+    h('div', { class: 'side__name' }, t('app.name')),
+    h('div', { class: 'side__tag' }, t('app.tag'))));
 sideEl.appendChild(brandEl);
 sideEl.appendChild(navEl);
 
-const resetBtn = h('button', { class: 'navlink', title: 'Reset demo data', 'aria-label': 'Reset demo data', html: `${icon('refresh')}<span>Reset demo data</span>` });
+const resetBtn = h('button', { class: 'navlink', title: t('nav.reset'), 'aria-label': t('nav.reset'), html: `${icon('refresh')}<span>${t('nav.reset')}</span>` });
 resetBtn.addEventListener('click', async () => {
   /* On a phone the sidebar is a fixed drawer at z-index 65 and the kit's scrim
      sits at 60, so a dialog opened from the footer would be covered by the very
      drawer it was opened from. The nav links already close it; so must these. */
   setDrawer(false);
-  const ok = await confirmDialog(
-    'This puts every service, staff rota, customer and booking back to the sample set. Anything you changed in this browser is dropped.',
-    { title: 'Reset demo data', danger: true, okLabel: 'Reset' });
+  const ok = await confirmDialog(t('common.resetBody'),
+    { title: t('nav.reset'), danger: true, okLabel: t('common.reset') });
   if (!ok) return;
   store.reset();
-  toast('Demo data reset', 'ok');
+  toast(t('common.demoReset'), 'ok');
 });
 
 /* The one dark element in the sidebar: it has to stand out against the teal
@@ -201,9 +196,9 @@ const siteLink = h('a', {
   href: 'https://www.nasvih.in',
   target: '_blank',
   rel: 'noopener noreferrer',
-  title: 'nasvih.in — opens in a new tab',
-  'aria-label': 'nasvih.in — opens in a new tab',
-  html: `${EXTERNAL}<span>nasvih.in</span>`,
+  title: t('nav.newTab', { label: t('nav.site') }),
+  'aria-label': t('nav.newTab', { label: t('nav.site') }),
+  html: `${EXTERNAL}<span dir="ltr">${t('nav.site')}</span>`,
 });
 
 /* Code brackets rather than the GitHub mark: the mark is a filled logo and
@@ -214,9 +209,9 @@ const srcLink = h('a', {
   href: REPO_URL,
   target: '_blank',
   rel: 'noopener noreferrer',
-  title: 'GitHub — opens in a new tab',
-  'aria-label': 'GitHub — opens in a new tab',
-  html: `${CODE}<span>GitHub</span>`,
+  title: t('nav.newTab', { label: t('nav.github') }),
+  'aria-label': t('nav.newTab', { label: t('nav.github') }),
+  html: `${CODE}<span dir="ltr">${t('nav.github')}</span>`,
 });
 
 /* ---------- sidebar preferences (own key, untouched by "Reset demo data") ---------- */
@@ -249,13 +244,13 @@ const RAIL_GLYPH = {
 const TONE_GLYPH = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.6"/><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2z" fill="currentColor" stroke="none"/></svg>';
 /* the colour control names no colour at all: the glyph carries it and
    aria-pressed reports whether the teal tone is on */
-const TONE_LABEL = 'Sidebar colour';
+const TONE_LABEL = t('nav.tone');
 
 const railBtn = h('button', {
   class: 'btn btn--sm',
   type: 'button',
   'data-act': 'rail',
-  html: `${RAIL_GLYPH.collapse}<span>Collapse sidebar</span>`,
+  html: `${RAIL_GLYPH.collapse}<span>${t('nav.collapse')}</span>`,
 });
 const toneBtn = h('button', {
   class: 'btn btn--sm',
@@ -270,7 +265,7 @@ brandEl.appendChild(h('div', { class: 'side__brandbtns' }, railBtn, toneBtn));
 function applyChrome() {
   const rail = !!ui.rail && wide.matches;
   shellEl.classList.toggle('is-rail', rail);
-  const railLabel = ui.rail ? 'Expand sidebar' : 'Collapse sidebar';
+  const railLabel = ui.rail ? t('nav.expand') : t('nav.collapse');
   railBtn.setAttribute('aria-pressed', String(!!ui.rail));
   railBtn.setAttribute('aria-label', railLabel);
   railBtn.title = railLabel;
@@ -294,9 +289,9 @@ wide.addEventListener('change', applyChrome);
 const publicBtn = h('a', {
   class: 'btn btn--sm topbar__public',
   href: `#/${PUBLIC}`,
-  title: 'Booking page — the page customers see',
-  'aria-label': 'Booking page — the page customers see',
-  html: `${icon('eye')}<span>Booking page</span>`,
+  title: t('common.bookingPageAria'),
+  'aria-label': t('common.bookingPageAria'),
+  html: `${icon('eye')}<span>${t('common.bookingPage')}</span>`,
 });
 
 /* Footer: the way out, the two links, then install and reset. About moved to
@@ -309,8 +304,8 @@ sideEl.appendChild(h('div', { class: 'side__foot' },
   h('div', { class: 'side__pair' }, siteLink, srcLink),
   installRow,
   h('div', { class: 'side__sub small faint', style: 'padding:10px 10px 2px;line-height:1.5' },
-    'Demo build by ',
-    h('a', { class: 'linkish', href: 'https://www.nasvih.in', target: '_blank', rel: 'noopener' }, 'Muhammed Nasvih V'))));
+    t('nav.builtBy'),
+    h('a', { class: 'linkish', href: 'https://www.nasvih.in', target: '_blank', rel: 'noopener' }, t('nav.author')))));
 
 /* The three chrome controls are icon-only and sit together, so they read as one
    group of browser-level switches rather than as desk actions. They are filled
@@ -343,9 +338,9 @@ const pubTag = h('div', { class: 'pubbar__tag' });
 const pubStaffBtn = h('a', {
   class: 'btn btn--sm pubbar__staff',
   href: '#/today',
-  title: 'Open the staff desk',
-  'aria-label': 'Open the staff desk',
-  html: `${icon('grid')}<span>Staff desk</span>`,
+  title: t('common.staffDeskAria'),
+  'aria-label': t('common.staffDeskAria'),
+  html: `${icon('grid')}<span>${t('common.staffDesk')}</span>`,
 });
 const pubHost = h('main', { class: 'pubmain', id: 'pubhost' });
 /* The one node on this page that outlives every redraw. src/views/book.js
@@ -355,23 +350,23 @@ const pubLive = h('p', { class: 'pub__sr', id: 'pub-live', role: 'status', 'aria
 
 /* Both footer controls are real buttons rather than links inside a sentence:
    this page is thumbed, and a 16px word in a paragraph is not a tap target. */
-const pubAboutBtn = h('button', { class: 'btn btn--sm', type: 'button' }, 'About this demo');
+const pubAboutBtn = h('button', { class: 'btn btn--sm', type: 'button' }, t('common.aboutDemo'));
 pubAboutBtn.addEventListener('click', () => aboutModal());
 
 const pubShell = h('div', { class: 'pubshell' },
   h('header', { class: 'pubbar' },
     /* Not a link: it would point at the page it is already on. */
     h('div', { class: 'pubbar__brand' },
-      h('span', { class: 'mark' }, 'SL'),
+      h('span', { class: 'mark' }, t('app.mark')),
       h('span', { class: 'pubbar__id' }, pubName, pubTag)),
     h('div', { class: 'spacer' }),
+    i18n.toggle(),
     themeToggle(),
     pubStaffBtn),
   pubLive,
   pubHost,
   h('footer', { class: 'pubfoot' },
-    h('p', { class: 'small muted' },
-      'A demo booking page. Everything on it is sample data kept in this browser — nothing is sent anywhere and no appointment is real.'),
+    h('p', { class: 'small muted' }, t('public.footNote')),
     h('div', { class: 'pubfoot__acts' },
       pubAboutBtn,
       h('a', {
@@ -379,8 +374,8 @@ const pubShell = h('div', { class: 'pubshell' },
         href: 'https://www.nasvih.in',
         target: '_blank',
         rel: 'noopener noreferrer',
-        'aria-label': 'nasvih.in — opens in a new tab',
-      }, 'Built by nasvih.in'))));
+        'aria-label': t('nav.newTab', { label: t('nav.site') }),
+      }, t('common.builtByLink')))));
 app.appendChild(pubShell);
 
 /* ---------- installable ---------- */
@@ -411,8 +406,9 @@ const ctx = {
    goes from "what needs me" to "how am I looking at it". Inside the phone
    frame the preview control is left out: previewing a preview is nonsense. */
 toolsEl.appendChild(mountBell(ctx));
-if (!IS_FRAMED) toolsEl.appendChild(deviceControls({ appName: 'slotly' }));
+toolsEl.appendChild(i18n.toggle());
 toolsEl.appendChild(themeToggle());
+if (!IS_FRAMED) toolsEl.appendChild(deviceControls({ appName: 'slotly' }));
 
 /* ---------- nav ---------- */
 function counts() {
@@ -432,12 +428,12 @@ function drawNav() {
   navEl.innerHTML = '';
   const groups = [...new Set(VIEWS.map((v) => v.group))];
   for (const g of groups) {
-    const box = h('div', { class: 'navgroup' }, h('div', { class: 'navgroup__label' }, g));
+    const box = h('div', { class: 'navgroup' }, h('div', { class: 'navgroup__label' }, t(`nav.groups.${g}`)));
     for (const v of VIEWS.filter((x) => x.group === g)) {
       const link = h('a', {
         class: `navlink${v.id === current ? ' is-active' : ''}`,
         href: `#/${v.id}`,
-        title: `${v.label} — ${v.sub.toLowerCase()}`,
+        title: t('nav.hint', { label: v.label, sub: v.sub }),
         'aria-label': v.label,
         'aria-current': v.id === current ? 'page' : null,
         html: `${icon(v.icon)}<span>${v.label}</span>`,
@@ -464,13 +460,13 @@ function draw() {
   const host = isPublic ? pubHost : viewHost;
   const v = isPublic ? null : (VIEWS.find((x) => x.id === current) || VIEWS[0]);
   if (isPublic) {
-    pubName.textContent = store.state.settings.deskName;
-    pubTag.textContent = store.state.settings.branch;
-    document.title = 'Book an appointment · slotly';
+    pubName.textContent = deskName(store.state);
+    pubTag.textContent = branchName(store.state);
+    document.title = t('app.publicTitle');
   } else {
     titleEl.textContent = v.title;
     subEl.textContent = v.sub;
-    document.title = `${v.title} · slotly`;
+    document.title = t('app.docTitle', { title: v.title });
   }
 
   const scroll = window.scrollY;
@@ -479,7 +475,7 @@ function draw() {
     host.appendChild(isPublic ? renderBook(ctx) : v.render(ctx));
   } catch (err) {
     host.appendChild(h('div', { class: 'empty' },
-      h('h3', {}, 'That screen could not be drawn'),
+      h('h3', {}, t('common.drawFailed')),
       h('p', { class: 'small muted' }, String(err && err.message ? err.message : err))));
   }
   if (!isPublic) drawNav();
@@ -511,22 +507,13 @@ store.subscribe(() => draw());
 nav.go();
 
 /* ---------- keyboard ---------- */
-const SHORTCUTS = [
-  ['1 … 7', 'Jump to a section in nav order'],
-  ['N', 'New booking'],
-  ['/', 'Focus the search box on this screen'],
-  ['⌘K / Ctrl+K', 'Open the Slotly Desk assistant'],
-  ['Esc', 'Close a dialog, drawer or the assistant'],
-  ['?', 'Show this list'],
-];
-
 function shortcutsModal() {
   modal({
-    title: 'Keyboard shortcuts',
-    body: h('dl', { class: 'kv' }, SHORTCUTS.flatMap(([k, d]) => [
-      h('dt', {}, k), h('dd', {}, d),
+    title: t('shortcuts.title'),
+    body: h('dl', { class: 'kv' }, t('shortcuts.rows').flatMap(([k, d]) => [
+      h('dt', { dir: 'ltr' }, k), h('dd', {}, d),
     ])),
-    actions: [{ label: 'Close', class: 'btn--primary' }],
+    actions: [{ label: t('common.close'), class: 'btn--primary' }],
   });
 }
 

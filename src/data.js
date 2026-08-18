@@ -5,7 +5,9 @@
    changes something. No network, no external source.
    ============================================================ */
 
-import { seeded, pick, between } from '../lib/ui.js';
+import { seeded, pick, between, dateLocale } from '../lib/ui.js';
+import { t } from './main.js';
+import { STRINGS } from './strings.js';
 
 export const STORE_KEY = 'slotly.v1';
 
@@ -19,11 +21,11 @@ export const toHM = (min) => {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 };
 export const hm12 = (hm) => {
-  const t = toMin(hm);
-  const h = Math.floor(t / 60);
-  const suffix = h < 12 ? 'am' : 'pm';
+  const mins = toMin(hm);
+  const h = Math.floor(mins / 60);
+  const suffix = t(h < 12 ? 'time.am' : 'time.pm');
   const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${String(t % 60).padStart(2, '0')} ${suffix}`;
+  return `${h12}:${String(mins % 60).padStart(2, '0')} ${suffix}`;
 };
 /** Local calendar day key — deliberately not toISOString(), which shifts by timezone. */
 export const dayKey = (d) => {
@@ -59,32 +61,76 @@ export const weekStart = (key) => {
   d.setDate(d.getDate() - shift);
   return dayKey(d);
 };
-export const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-export const DOW_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/* Weekday names are read out of the dictionary rather than out of the date
+   formatter, so the app controls the abbreviations the calendar header has to
+   fit. The index is always getDay() — 0 is Sunday in both languages, and the
+   week's starting column is decided by weekStart() above, never by the locale. */
+export const dow = (i) => t('dow.short')[i];
+export const dowLong = (i) => t('dow.long')[i];
+export const DOW_LONG_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export const monthShort = (d) => d.toLocaleDateString(dateLocale(), { month: 'short' });
 export const dayLabel = (key) => {
   const d = parseDay(key);
-  return `${DOW[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${d.toLocaleDateString('en-GB', { month: 'short' })}`;
+  return `${dow(d.getDay())} ${String(d.getDate()).padStart(2, '0')} ${monthShort(d)}`;
 };
 export const relativeDay = (key) => {
-  const t = todayKey();
-  if (key === t) return 'Today';
-  if (key === addDays(t, 1)) return 'Tomorrow';
-  if (key === addDays(t, -1)) return 'Yesterday';
+  const now = todayKey();
+  if (key === now) return t('rel.today');
+  if (key === addDays(now, 1)) return t('rel.tomorrow');
+  if (key === addDays(now, -1)) return t('rel.yesterday');
   return dayLabel(key);
 };
 
 /* ---------- vocabulary ---------- */
-export const STATUS = {
-  booked: { label: 'Booked', pill: 'pill--info' },
-  called: { label: 'Called', pill: 'pill--amber' },
-  serving: { label: 'Serving', pill: 'pill--warn' },
-  done: { label: 'Done', pill: 'pill--ok' },
-  'no-show': { label: 'No-show', pill: 'pill--bad' },
-  cancelled: { label: 'Cancelled', pill: '' },
+/* The pill class is fixed; the word is not. `label` is a getter so a status
+   read at render time is in whatever language is on screen, while the keys
+   stored against a booking stay language-neutral. */
+const STATUS_PILL = {
+  booked: 'pill--info',
+  called: 'pill--amber',
+  serving: 'pill--warn',
+  done: 'pill--ok',
+  'no-show': 'pill--bad',
+  cancelled: '',
 };
+export const STATUS = Object.fromEntries(Object.keys(STATUS_PILL).map((k) => [k, {
+  pill: STATUS_PILL[k],
+  get label() { return t(`status.${k}`); },
+}]));
 export const OPEN_STATUSES = ['booked', 'called', 'serving'];
 export const ACTIVE_STATUSES = ['booked', 'called', 'serving', 'done'];
+/* Stored on the record, so these stay English keys; `channelLabel` is what
+   anybody actually reads. */
 export const CHANNELS = ['Walk-in', 'Phone', 'Website', 'Front desk'];
+export const channelLabel = (v) => t(`channel.${v}`);
+
+/* ---------- sample-data labels ----------
+   The seed writes English into the store, and the store outlives a language
+   switch. So anything still holding exactly the text the seed put there is
+   translated on its way to the screen; the moment the reader edits it, their
+   own words are shown untouched. */
+export function demoText(key, stored) {
+  if (stored === undefined || stored === null) return stored;
+  if (stored !== STRINGS.en.demo[key]) return stored;
+  /* `demo` is keyed by flat dotted strings ('svc.svc-lab.name'), so the
+     branch is fetched whole and indexed rather than walked key by key. */
+  const half = t('demo');
+  const value = half && typeof half === 'object' ? half[key] : undefined;
+  return value === undefined ? stored : value;
+}
+
+export const svcName = (svc) => (svc && svc.id ? demoText(`svc.${svc.id}.name`, svc.name) : (svc && svc.name));
+export const staffRole = (st) => (st && st.id ? demoText(`staff.${st.id}.role`, st.role) : (st && st.role));
+export const staffRoom = (st) => (st && st.id ? demoText(`staff.${st.id}.room`, st.room) : (st && st.room));
+export const deskName = (state) => demoText('settings.deskName', state.settings.deskName);
+export const branchName = (state) => demoText('settings.branch', state.settings.branch);
+export const templateText = (state, key) => demoText(`settings.${key}`, state.settings[key]);
+export const tagLabel = (tag) => demoText(`tag.${tag}`, tag);
+
+/* A history line is stored as a key plus its variables, so a booking written
+   in one language still reads correctly in the other. Records from an earlier
+   build carry plain text and are shown as they were saved. */
+export const eventText = (e) => (e && e.key ? t(`event.${e.key}`, e.vars) : (e && e.text) || '');
 
 const FIRST = [
   'Rehan', 'Anjali', 'Faizal', 'Meera', 'Sajid', 'Devika', 'Nithin', 'Ayesha',
@@ -269,9 +315,19 @@ export const tokenLabel = (state, b) =>
   `${(state.settings.tokenPrefix || 'A')}${String(b.token).padStart(3, '0')}`;
 
 /* ---------- lookups ---------- */
-export const svcOf = (state, id) => state.services.find((s) => s.id === id) || { name: 'Removed service', code: '—', durationMin: 0, bufferMin: 0, priceInr: 0 };
-export const staffOf = (state, id) => state.staff.find((s) => s.id === id) || { name: 'Unassigned', initials: '—', role: '', room: '' };
-export const custOf = (state, id) => state.customers.find((c) => c.id === id) || { name: 'Walk-in guest', phone: '—', email: '' };
+/* Reads, never writes: the copy carries the label in the reader's language
+   while the record in the store keeps the canonical English the seed wrote. */
+export const svcOf = (state, id) => {
+  const svc = state.services.find((s) => s.id === id);
+  if (!svc) return { name: t('data.removedService'), code: '—', durationMin: 0, bufferMin: 0, priceInr: 0 };
+  return Object.assign({}, svc, { name: svcName(svc) });
+};
+export const staffOf = (state, id) => {
+  const st = state.staff.find((s) => s.id === id);
+  if (!st) return { name: t('data.unassigned'), initials: '—', role: '', room: '' };
+  return Object.assign({}, st, { role: staffRole(st), room: staffRoom(st) });
+};
+export const custOf = (state, id) => state.customers.find((c) => c.id === id) || { name: t('data.walkInGuest'), phone: '—', email: '' };
 
 export const bookingsOn = (state, key) =>
   state.bookings.filter((b) => b.date === key).sort((a, b) => a.time.localeCompare(b.time));
@@ -422,9 +478,10 @@ export function nextRef(state) {
   return `SL-${max + 1}`;
 }
 
-export function logEvent(b, text) {
+/** `logEvent(b, 'called')` · `logEvent(b, 'moved', { fromDay, … })` */
+export function logEvent(b, key, vars) {
   b.history = b.history || [];
-  b.history.unshift({ at: Date.now(), text });
+  b.history.unshift(vars ? { at: Date.now(), key, vars } : { at: Date.now(), key });
   if (b.history.length > 12) b.history.length = 12;
   return b;
 }
@@ -446,7 +503,7 @@ export function createBooking(state, { date, time, serviceId, staffId, customerI
     channel: channel || 'Front desk',
     note: note || '',
     createdAt: Date.now(),
-    history: [{ at: Date.now(), text: 'Booked at the front desk' }],
+    history: [{ at: Date.now(), key: 'bookedAtDesk' }],
   };
   state.bookings.push(b);
   assignTokens(state.bookings);
@@ -458,7 +515,7 @@ export function addBlock(state, { staffId, date, start, end, reason }) {
   const rec = {
     id: `blk-${Math.random().toString(36).slice(2, 8)}`,
     staffId, date, start, end,
-    reason: reason || 'Held at the front desk',
+    reason: reason || t('data.heldAtDesk'),
     at: Date.now(),
   };
   state.blocks = state.blocks || [];
@@ -474,15 +531,15 @@ export function renderTemplate(tpl, vars) {
 export function templateVars(state, b) {
   if (!b) {
     return {
-      name: 'Meera Nair', service: 'General consultation', desk: state.settings.deskName,
+      name: 'Meera Nair', service: demoText('svc.svc-consult.name', STRINGS.en.demo['svc.svc-consult.name']), desk: deskName(state),
       date: dayLabel(todayKey()), time: hm12('10:30'), staff: 'Rehana Mansoor',
       token: `${state.settings.tokenPrefix}004`, price: `${state.settings.currency}400`, ref: 'SL-1041',
     };
   }
   return {
     name: custOf(state, b.customerId).name,
-    service: svcOf(state, b.serviceId).name,
-    desk: state.settings.deskName,
+    service: svcName(svcOf(state, b.serviceId)),
+    desk: deskName(state),
     date: dayLabel(b.date),
     time: hm12(b.time),
     staff: staffOf(state, b.staffId).name,

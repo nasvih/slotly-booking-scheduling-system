@@ -7,9 +7,11 @@
    ============================================================ */
 
 import { h, icon } from '../lib/ui.js';
+import { t } from './main.js';
 import {
   todayKey, addDays, hm12, toMin, deskNowMin, relativeDay, dayLabel,
   svcOf, staffOf, custOf, tokenLabel, shiftMinutes, staffWorks, OPEN_STATUSES,
+  svcName,
 } from './data.js';
 
 const NOTIFY_KEY = 'slotly.notify';
@@ -32,13 +34,13 @@ function saveRead(set) {
  * moves or changes becomes a new, unread notification.
  */
 export function buildNotifications(state) {
-  const t = todayKey();
+  const key = todayKey();
   const now = deskNowMin(state.settings);
   const out = [];
 
   /* 1. starting within the hour */
   for (const b of state.bookings) {
-    if (b.date !== t) continue;
+    if (b.date !== key) continue;
     if (b.status !== 'booked' && b.status !== 'called') continue;
     const m = toMin(b.time);
     if (m < now || m > now + 60) continue;
@@ -47,15 +49,20 @@ export function buildNotifications(state) {
       kind: 'soon',
       tone: 'info',
       sort: m,
-      title: `${tokenLabel(state, b)} at ${hm12(b.time)}`,
-      text: `${custOf(state, b.customerId).name} · ${svcOf(state, b.serviceId).name} with ${staffOf(state, b.staffId).name}. ${Math.max(0, m - now)} minutes away.`,
+      title: t('notify.soonTitle', { token: tokenLabel(state, b), time: hm12(b.time) }),
+      text: t('notify.soonText', {
+        name: custOf(state, b.customerId).name,
+        service: svcName(svcOf(state, b.serviceId)),
+        staff: staffOf(state, b.staffId).name,
+        mins: Math.max(0, m - now),
+      }),
       when: hm12(b.time),
     });
   }
 
   /* 2. staff running over — still at the chair past the end of the block */
   for (const b of state.bookings) {
-    if (b.date !== t || b.status !== 'serving') continue;
+    if (b.date !== key || b.status !== 'serving') continue;
     const over = now - (toMin(b.time) + b.blockMin);
     if (over <= 0) continue;
     out.push({
@@ -63,56 +70,64 @@ export function buildNotifications(state) {
       kind: 'over',
       tone: 'warn',
       sort: -200 - over,
-      title: `${staffOf(state, b.staffId).name} is running over`,
-      text: `${tokenLabel(state, b)} · ${custOf(state, b.customerId).name} should have finished at ${hm12(b.time)} plus ${b.blockMin} minutes. That is ${over} minutes past.`,
+      title: t('notify.overTitle', { staff: staffOf(state, b.staffId).name }),
+      text: t('notify.overText', {
+        token: tokenLabel(state, b), name: custOf(state, b.customerId).name,
+        time: hm12(b.time), block: b.blockMin, over,
+      }),
       when: `+${over}m`,
     });
   }
 
   /* 3. today's no-shows */
   for (const b of state.bookings) {
-    if (b.date !== t || b.status !== 'no-show') continue;
+    if (b.date !== key || b.status !== 'no-show') continue;
     out.push({
       id: `noshow:${b.id}`,
       kind: 'noshow',
       tone: 'bad',
       sort: -100 + toMin(b.time) / 1000,
-      title: `No-show · ${tokenLabel(state, b)}`,
-      text: `${custOf(state, b.customerId).name} did not turn up for ${hm12(b.time)}. ${b.blockMin} minutes went back on the grid.`,
+      title: t('notify.noShowTitle', { token: tokenLabel(state, b) }),
+      text: t('notify.noShowText', {
+        name: custOf(state, b.customerId).name, time: hm12(b.time), block: b.blockMin,
+      }),
       when: hm12(b.time),
     });
   }
 
   /* 4. cancellations still ahead of us */
   for (const b of state.bookings) {
-    if (b.status !== 'cancelled' || b.date < t || b.date > addDays(t, 7)) continue;
+    if (b.status !== 'cancelled' || b.date < key || b.date > addDays(key, 7)) continue;
     out.push({
       id: `cancel:${b.id}`,
       kind: 'cancel',
       tone: 'muted',
       sort: 100 + toMin(b.time) / 1000,
-      title: `Cancelled · ${b.ref}`,
-      text: `${custOf(state, b.customerId).name} · ${svcOf(state, b.serviceId).name} on ${relativeDay(b.date)} at ${hm12(b.time)}${b.note ? ` — ${b.note}` : ''}.`,
+      title: t('notify.cancelTitle', { ref: b.ref }),
+      text: t('notify.cancelText', {
+        name: custOf(state, b.customerId).name, service: svcName(svcOf(state, b.serviceId)),
+        day: relativeDay(b.date), time: hm12(b.time), note: b.note,
+      }),
       when: relativeDay(b.date),
     });
   }
 
   /* 5. anyone booked past the minutes they are actually on for */
   for (const st of state.staff) {
-    if (!staffWorks(state, st.id, t)) continue;
-    const cap = shiftMinutes(state, st.id, t);
+    if (!staffWorks(state, st.id, key)) continue;
+    const cap = shiftMinutes(state, st.id, key);
     const booked = state.bookings
-      .filter((b) => b.date === t && b.staffId === st.id && b.status !== 'cancelled')
+      .filter((b) => b.date === key && b.staffId === st.id && b.status !== 'cancelled')
       .reduce((n, b) => n + b.blockMin, 0);
     if (!cap || booked <= cap) continue;
     out.push({
-      id: `overbook:${st.id}:${t}:${booked}`,
+      id: `overbook:${st.id}:${key}:${booked}`,
       kind: 'over',
       tone: 'warn',
       sort: -150,
-      title: `${st.name} is over their hours`,
-      text: `${booked} booked minutes against ${cap} on shift for ${dayLabel(t)}. Something needs moving.`,
-      when: 'today',
+      title: t('notify.overbookTitle', { staff: st.name }),
+      text: t('notify.overbookText', { booked, capacity: cap, day: dayLabel(key) }),
+      when: t('notify.today'),
     });
   }
 
@@ -132,7 +147,7 @@ export function mountBell(ctx) {
   });
   btn.appendChild(count);
 
-  const panel = h('div', { class: 'notepanel', role: 'dialog', 'aria-label': 'Notifications', hidden: true });
+  const panel = h('div', { class: 'notepanel', role: 'dialog', 'aria-label': t('notify.label'), hidden: true });
   const wrap = h('div', { class: 'bellwrap' }, btn, panel);
 
   const unread = () => buildNotifications(ctx.state).filter((n) => !read.has(n.id));
@@ -142,7 +157,7 @@ export function mountBell(ctx) {
     count.textContent = n > 9 ? '9+' : String(n);
     count.hidden = n === 0;
     btn.classList.toggle('has-unread', n > 0);
-    const label = n ? `Notifications — ${n} unread` : 'Notifications — nothing new';
+    const label = n ? t('notify.unread', { n }) : t('notify.nothingNew');
     btn.setAttribute('aria-label', label);
     btn.title = label;
   }
@@ -150,7 +165,7 @@ export function mountBell(ctx) {
   function paintPanel() {
     const list = buildNotifications(ctx.state);
     panel.innerHTML = '';
-    const allRead = h('button', { class: 'btn btn--sm', type: 'button' }, 'Mark all read');
+    const allRead = h('button', { class: 'btn btn--sm', type: 'button' }, t('notify.markAll'));
     allRead.disabled = !list.some((n) => !read.has(n.id));
     /* Repainting removes the button that was clicked, so by the time the event
        reaches document the target is detached and the outside-click guard would
@@ -163,14 +178,13 @@ export function mountBell(ctx) {
       paintPanel();
     });
     panel.appendChild(h('div', { class: 'notepanel__head' },
-      h('h3', {}, 'Notifications'),
+      h('h3', {}, t('notify.label')),
       allRead));
 
     if (!list.length) {
       panel.appendChild(h('div', { class: 'notepanel__empty' },
-        h('div', { class: 'label' }, 'All clear'),
-        h('p', { class: 'small muted', style: 'margin-top:6px' },
-          'Nothing starting within the hour, no no-shows, no cancellations in the week ahead and nobody running over.')));
+        h('div', { class: 'label' }, t('notify.allClear')),
+        h('p', { class: 'small muted', style: 'margin-top:6px' }, t('notify.allClearBody'))));
       return;
     }
 
@@ -180,13 +194,13 @@ export function mountBell(ctx) {
       const row = h('button', {
         class: `noterow${isNew ? ' is-new' : ''}`,
         type: 'button',
-        'aria-label': `${isNew ? 'Unread. ' : ''}${n.title}. ${n.text}`,
+        'aria-label': `${isNew ? t('notify.unreadPrefix') : ''}${n.title}. ${n.text}`,
       },
       h('span', { class: `noterow__dot noterow__dot--${n.tone}`, 'aria-hidden': 'true' }),
       h('span', { class: 'noterow__body' },
         h('span', { class: 'noterow__title' }, n.title),
         /* the dot is a colour; the word is what actually says "unread" */
-        isNew ? h('span', { class: 'noterow__new' }, 'New') : null,
+        isNew ? h('span', { class: 'noterow__new' }, t('notify.new')) : null,
         h('span', { class: 'noterow__text' }, n.text)),
       h('span', { class: 'noterow__when mono' }, n.when));
       row.addEventListener('click', (e) => {
@@ -199,8 +213,7 @@ export function mountBell(ctx) {
       body.appendChild(row);
     }
     panel.appendChild(body);
-    panel.appendChild(h('div', { class: 'notepanel__foot small faint' },
-      'Read marks are kept in this browser. The list itself is worked out from the live bookings each time you open it.'));
+    panel.appendChild(h('div', { class: 'notepanel__foot small faint' }, t('notify.foot')));
   }
 
   let open = false;

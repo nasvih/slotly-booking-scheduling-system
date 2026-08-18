@@ -3,7 +3,7 @@
    network), and a single versioned cache so an update wipes the old one.
    Bump CACHE_VERSION whenever the file list or any cached asset changes. */
 
-const CACHE_VERSION = 'v12';
+const CACHE_VERSION = 'v14';
 const CACHE = `${self.registration.scope}::${CACHE_VERSION}`;
 
 /* slotly's own files. Every one of these must exist: a single 404 fails the
@@ -19,8 +19,10 @@ const SHELL = [
   './lib/ui.js',
   './lib/assistant.js',
   './lib/pwa.js',
+  './lib/i18n.js',
 
   './src/main.js',
+  './src/strings.js',
   './src/data.js',
   './src/agent.js',
   './src/actions.js',
