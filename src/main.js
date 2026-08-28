@@ -2,7 +2,7 @@
    slotly — boot: store, shell, nav, hash router, assistant.
    ============================================================ */
 
-import { h, qs, icon, createStore, router, toast, modal, confirmDialog, setRelativeLabels } from '../lib/ui.js';
+import { h, qs, icon, createStore, router, toast, modal, confirmDialog, setAgoStrings, setUiStrings } from '../lib/ui.js';
 import { createI18n } from '../lib/i18n.js';
 import { STRINGS } from './strings.js';
 import { initPWA } from '../lib/pwa.js';
@@ -27,14 +27,16 @@ import renderSettings from './views/settings.js';
    index.html has already done the same inline, so nothing repaints. */
 const i18n = createI18n({ key: 'slotly', dict: STRINGS });
 export const t = i18n.t;
-/* lib/ui.js formats "3h ago" and the calendar's dates; it is shared by every
-   demo app and holds no dictionary of its own, so it is handed one. */
-setRelativeLabels({
-  justNow: () => t('rel.justNow'),
-  minutes: (n) => t('rel.minutes', { n }),
-  hours: (n) => t('rel.hours', { n }),
-  days: (n) => t('rel.days', { n }),
+/* lib/ui.js formats "3h ago", the calendar's dates and the two buttons on a
+   confirm dialog; it is shared by every demo app and holds no dictionary of
+   its own, so it is handed one. */
+setAgoStrings({
+  justNow: t('rel.justNow'),
+  m: (n) => t('rel.minutes', { n }),
+  h: (n) => t('rel.hours', { n }),
+  d: (n) => t('rel.days', { n }),
 });
+setUiStrings({ cancel: t('common.cancel'), confirm: t('common.confirm'), close: t('common.close') });
 
 /* The theme is read before anything is drawn — index.html sets it inline so
    there is no white flash, and this keeps the two in step. */
@@ -387,6 +389,16 @@ const installBtn = initPWA({
   mount: installRow,
   appName: 'Slotly',
   onNote: (msg) => toast(msg),
+  /* lib/pwa.js carries no dictionary either, so the control is handed this
+     app's — otherwise it is the one English word left in an Arabic sidebar. */
+  labels: {
+    install: t('pwa.install'),
+    title: (app) => t('pwa.installTitle', { app }),
+    installed: (app) => t('pwa.installed', { app }),
+    dismissed: t('pwa.dismissed'),
+    ios: t('pwa.ios'),
+    other: t('pwa.other'),
+  },
 });
 if (installBtn) installRow.insertBefore(installBtn, installRow.firstChild);
 

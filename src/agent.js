@@ -454,17 +454,19 @@ export function buildAgent(ctx) {
     /* The panel's own furniture — lib/assistant.js keeps English defaults for
        apps that ship no dictionary, so it is handed this one's. */
     ui: {
-      askAbout: (name) => t('agent.ui.askAbout', { name }),
       openAria: (name) => t('agent.ui.openAria', { name }),
+      fabTitle: (name) => t('agent.ui.askAbout', { name }),
       clear: t('agent.ui.clear'),
       close: t('agent.ui.close'),
-      send: t('agent.ui.send'),
       placeholder: t('agent.ui.placeholder'),
+      send: t('agent.ui.send'),
       you: t('agent.ui.you'),
       working: t('agent.ui.working'),
-      edgeCase: t('agent.ui.edgeCase'),
-      actionFailed: t('agent.ui.actionFailed'),
       done: t('agent.ui.done'),
+      applied: t('agent.ui.applied'),
+      edge: t('agent.ui.edgeCase'),
+      failed: t('agent.ui.actionFailed'),
+      searched: t('agent.ui.searched'),
     },
   });
 }

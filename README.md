@@ -7,6 +7,8 @@ no-show history and message templates.
 Plain HTML, CSS and ES modules. No dependencies, no build step, no bundler, no framework,
 no backend. It runs from any static file server and from GitHub Pages unchanged.
 
+**Live:** [slotly.nasvih.in](https://slotly.nasvih.in)
+
 **Author:** Muhammed Nasvih V — [nasvih.in](https://www.nasvih.in) · [github.com/nasvih](https://github.com/nasvih)
 
 **Source:** [github.com/nasvih/slotly-booking-scheduling-system](https://github.com/nasvih/slotly-booking-scheduling-system)

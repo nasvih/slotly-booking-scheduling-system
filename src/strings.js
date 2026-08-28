@@ -92,6 +92,7 @@ const en = {
 
   common: {
     cancel: 'Cancel',
+    confirm: 'Confirm',
     close: 'Close',
     save: 'Save',
     done: 'Done',
@@ -209,6 +210,17 @@ const en = {
     short: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     long: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   },
+  /* lib/pwa.js is shared by the demo apps and carries no dictionary, so the
+     install control is handed these. {app} is filled in with the app name. */
+  pwa: {
+    install: 'Install app',
+    installTitle: 'Install {app} on this device',
+    installed: '{app} installed. It opens in its own window from now on.',
+    dismissed: 'Install dismissed — the button stays here if you change your mind.',
+    ios: 'On iPhone and iPad: tap Share, then "Add to Home Screen".',
+    other: 'Use your browser menu and choose "Install app" or "Add to Home screen".',
+  },
+
   rel: {
     today: 'Today',
     tomorrow: 'Tomorrow',
@@ -1161,6 +1173,7 @@ const ar = {
 
   common: {
     cancel: 'إلغاء',
+    confirm: 'تأكيد',
     close: 'إغلاق',
     save: 'حفظ',
     done: 'تم',
@@ -1277,6 +1290,15 @@ const ar = {
     short: ['أحد', 'إثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'],
     long: ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
   },
+  pwa: {
+    install: 'تثبيت التطبيق',
+    installTitle: 'تثبيت {app} على هذا الجهاز',
+    installed: 'تم تثبيت {app}، وسيفتح في نافذته الخاصة من الآن فصاعداً.',
+    dismissed: 'أُلغي التثبيت — الزر باقٍ هنا إن غيّرت رأيك.',
+    ios: 'على الآيفون والآيباد: المس زر المشاركة ثم «إضافة إلى الشاشة الرئيسية».',
+    other: 'افتح قائمة المتصفّح واختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
+  },
+
   rel: {
     today: 'اليوم',
     tomorrow: 'غداً',
