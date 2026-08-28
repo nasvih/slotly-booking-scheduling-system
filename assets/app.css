@@ -189,7 +189,11 @@ table.data td.right,table.data th.right{text-align:right}
 .switch input:checked+.switch__track::after{transform:translateX(16px)}
 
 /* == 10. modal + toast + drawer == */
-.scrim{position:fixed;inset:0;background:rgba(23,24,26,.42);z-index:60;display:grid;place-items:center;padding:20px}
+/* 78 puts a modal over everything it can be opened from — the phone sidebar
+   (65), a drawer (70), the assistant panel (75) — and still under the toasts
+   (80). At 60 a confirm raised from the sidebar rendered behind it, with its
+   Cancel button unreachable on a touch screen. */
+.scrim{position:fixed;inset:0;background:rgba(23,24,26,.42);z-index:78;display:grid;place-items:center;padding:20px}
 .modal{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-3);width:min(520px,100%);max-height:86vh;overflow:auto}
 .modal__head{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
 .modal__head h3{flex:1}
@@ -327,6 +331,10 @@ table.data td.right,table.data th.right{text-align:right}
   .shell{grid-template-columns:minmax(0,1fr)}
   .side{position:fixed;left:0;top:0;z-index:65;width:var(--sidebar);transform:translateX(-100%);transition:transform .18s}
   .side.is-open{transform:none}
+  /* An open sidebar covers the button that opened it, so a touch screen needs
+     somewhere to tap to dismiss it. Put <div class="side-scrim" hidden> after
+     the shell and unhide it with the sidebar. */
+  .side-scrim{position:fixed;inset:0;background:rgba(23,24,26,.42);z-index:64;border:0;padding:0;margin:0;cursor:pointer}
   .sidebtn{display:inline-flex}
   .g3{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -338,9 +346,16 @@ table.data td.right,table.data th.right{text-align:right}
   .page-head .btnrow,.page-head .row{width:100%}
   .search{max-width:none;flex-basis:100%}
   /* a card table has no room to keep headers on one line at phone width;
-     data grids opt back in with .data--grid and scroll inside their wrapper */
+     data grids opt back in with .data--grid and scroll inside their wrapper.
+     A table already inside a scrolling wrapper is excluded too — wrapping its
+     headers there buys nothing and squeezes every column to one word a line
+     while the row still runs past the edge. */
   table.data:not(.data--grid) th{white-space:normal}
+  .tablewrap--scroll table.data th{white-space:nowrap}
   .view{padding:16px}
+  /* .view keeps its own bottom room here, or the foot of the page sits under
+     the fixed assistant launcher. */
+  .view--pad{padding:16px 16px 88px}
   /* 100vh is the whole window, not the part a phone browser actually shows,
      so the head of the panel — and the close button in it — sat behind the
      address bar. The safe-area padding keeps it clear of a notch too. */
